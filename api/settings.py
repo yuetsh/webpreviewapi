@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-hh=iag^*2+(qj04_)9sup5v9nf$n5=ezs02zgcd3yh4n2u_1qd"
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["web.xuyue.cc", "localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -129,5 +130,5 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "account.User"
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "https://web.xuyue.cc"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:8098", "https://web.xuyue.cc"]
 CORS_ALLOW_CREDENTIALS = True
