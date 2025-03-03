@@ -42,7 +42,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "ninja",
     "corsheaders",
+    "django_extensions",
     "account",
+    "tutorial",
 ]
 
 MIDDLEWARE = [
