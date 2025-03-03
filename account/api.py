@@ -7,6 +7,11 @@ from .models import User
 router = Router()
 
 
+@router.get("/")
+def account(request):
+    return {"message": "success"}
+
+
 @router.post("/register")
 def user_register(request, payload: UserRegistrationSchema):
     if User.objects.filter(username=payload.username).exists():
