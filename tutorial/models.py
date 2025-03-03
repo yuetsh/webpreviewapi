@@ -3,7 +3,7 @@ from django_extensions.db.models import TimeStampedModel
 
 
 class Tutorial(TimeStampedModel):
-    display = models.CharField(max_length=10, unique=True)
+    display = models.IntegerField(unique=True)
     title = models.CharField(max_length=100)
     content = models.TextField()
     is_public = models.BooleanField(default=False)
