@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from ninja import Router
 from ninja.errors import HttpError
 from .schemas import UserRegistrationSchema, UserLoginSchema
-from .models import User
+from .models import RoleChoices, User
 
 router = Router()
 
@@ -29,7 +29,7 @@ def user_login(request, payload: UserLoginSchema):
     user = authenticate(username=payload.username, password=payload.password)
     if user is not None:
         login(request, user)
-        return request.user.get_username()
+        return {"username": user.username, "role": user.role}
     else:
         raise HttpError(401, "Invalid credentials")
 
@@ -42,4 +42,7 @@ def user_logout(request):
 @router.get("/profile")
 def current_user_profile(request):
     # 暂时这样写
-    return request.user.get_username()
+    if request.user.is_authenticated:
+        return {"username": request.user.get_username(), "role": request.user.role}
+    else:
+        return {"username": "", "role": RoleChoices.NORMAL}
