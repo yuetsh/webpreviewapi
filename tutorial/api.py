@@ -45,6 +45,19 @@ def create_or_update(request, payload: TutorialIn):
         return {"message": "创建成功"}
 
 
+@router.put("/public/{display}")
+@super_required
+def toggle_public(request, display: int):
+    try:
+        item = Tutorial.objects.get(display=display)
+        item.is_public = not item.is_public
+        item.save()
+        label = "公开" if item.is_public else "隐藏"
+        return {"message": f"【{item.display}】{item.title} 已{label}"}
+    except Tutorial.DoesNotExist:
+        raise HttpError(404, "此序号无教程")
+
+
 @router.delete("/{display}")
 @super_required
 def remove(request, display: int):
