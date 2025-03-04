@@ -2,5 +2,6 @@ from django.apps import AppConfig
 
 
 class TutorialConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'tutorial'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "tutorial"
+    verbose_name = "教程"
