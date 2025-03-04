@@ -16,7 +16,7 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: root
-          key: ${{ secrets.Key }}
+          key: ${{ secrets.KEY }}
           script: |
             cd ~/WebPreview/api
             git pull
