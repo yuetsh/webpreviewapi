@@ -14,4 +14,16 @@ class User(AbstractUser):
         max_length=20,
         choices=RoleChoices.choices,
         default=RoleChoices.NORMAL,
+        verbose_name="权限",
     )
+    raw_password = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="明文密码",
+    )
+
+    def set_password(self, raw_password):
+        super().set_password(raw_password)
+        self.raw_password = raw_password
+        self.save()

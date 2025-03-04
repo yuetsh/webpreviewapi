@@ -1,9 +1,11 @@
+from typing import List, Optional
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
 from ninja.errors import HttpError
-from .schemas import UserRegistrationSchema, UserLoginSchema
+from .schemas import UserListSchema, UserRegistrationSchema, UserLoginSchema
 from .models import RoleChoices, User
+from .decorators import super_required
 
 router = Router()
 
@@ -38,8 +40,23 @@ def user_logout(request):
 
 @router.get("/profile")
 def my_profile(request):
-    # 暂时这样写
+    # 首页获取用户状态
     if request.user.is_authenticated:
         return {"username": request.user.get_username(), "role": request.user.role}
     else:
         return {"username": "", "role": RoleChoices.NORMAL}
+
+
+@router.get("/list", response=List[UserListSchema])
+@super_required
+def list(request, username: str):
+    # 之后加上分页
+    users = User.objects.filter(username__icontains=username)
+    return [UserListSchema.from_orm(user) for user in users]
+
+
+@router.post("/batch")
+@super_required
+def batch_create(request):
+    # 批量创建账号
+    pass
