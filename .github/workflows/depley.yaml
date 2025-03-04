@@ -1,23 +1,23 @@
-name: Deploy
+# name: Deploy
 
-on:
-  push:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - main
 
-jobs:
-  deploy-and-run:
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy-and-run:
+#     runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - uses: appleboy/ssh-action@v1.2.1
-        with:
-          host: ${{ secrets.HOST }}
-          username: root
-          key: ${{ secrets.KEY }}
-          script: |
-            cd ~/WebPreview/api
-            git pull
-            sh ~/WebPreview/run.sh
+#       - uses: appleboy/ssh-action@v1.2.1
+#         with:
+#           host: ${{ secrets.HOST }}
+#           username: root
+#           key: ${{ secrets.KEY }}
+#           script: |
+#             cd ~/WebPreview/api
+#             git pull
+#             sh ~/WebPreview/run.sh
