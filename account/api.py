@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
