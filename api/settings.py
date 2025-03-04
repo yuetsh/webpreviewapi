@@ -29,7 +29,7 @@ DEBUG = os.getenv("ENV") != "production"
 if DEBUG:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 else:
-    ALLOWED_HOSTS = ["webapi.xuyue.cc"]
+    ALLOWED_HOSTS = ["web.xuyue.cc"]
 
 # Application definition
 
@@ -141,7 +141,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "django_static/"
+
+STATIC_ROOT = BASE_DIR / "static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
