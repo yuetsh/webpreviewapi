@@ -11,6 +11,8 @@ gunicorn==23.0.0
 h11==0.14.0
 idna==3.10
 packaging==24.2
+psycopg==3.2.5
+psycopg-binary==3.2.5
 pydantic==2.10.6
 pydantic-core==2.27.2
 sqlparse==0.5.3
