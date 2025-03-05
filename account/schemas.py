@@ -9,6 +9,7 @@ class UserListSchema(ModelSchema):
     def from_orm(cls, obj):
         raw_password = obj.raw_password if obj.role == RoleChoices.NORMAL else ""
         return cls(
+            id=obj.id,
             username=obj.username,
             raw_password=raw_password,
             role=obj.role,
@@ -20,6 +21,7 @@ class UserListSchema(ModelSchema):
     class Meta:
         model = User
         fields = [
+            "id",
             "username",
             "raw_password",
             "role",

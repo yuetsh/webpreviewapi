@@ -163,3 +163,7 @@ else:
     CORS_ALLOWED_ORIGINS = ["https://web.xuyue.cc"]
 
 CORS_ALLOW_CREDENTIALS = True
+
+NINJA_PAGINATION_CLASS = "ninja.pagination.PageNumberPagination"
+
+NINJA_PAGINATION_PER_PAGE = 20

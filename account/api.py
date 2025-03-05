@@ -2,6 +2,7 @@ from typing import List
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
+from ninja.pagination import paginate, PageNumberPagination
 from ninja.errors import HttpError
 from .schemas import UserListSchema, UserRegistrationSchema, UserLoginSchema
 from .models import RoleChoices, User
@@ -49,9 +50,12 @@ def my_profile(request):
 
 @router.get("/list", response=List[UserListSchema])
 @super_required
-def list(request, username: str):
-    # 之后加上分页
+@paginate
+def list(request, username: str, role: str = None):
+    # 用户列表
     users = User.objects.filter(username__icontains=username)
+    if role:
+        users = users.filter(role=role)
     return [UserListSchema.from_orm(user) for user in users]
 
 
@@ -60,3 +64,18 @@ def list(request, username: str):
 def batch_create(request):
     # 批量创建账号
     pass
+
+
+@router.put("/active/{id}")
+@super_required
+def toggle_user_is_active(request, id: int):
+    # 封号和解封
+    try:
+        user = User.objects.get(id=id)
+        user.is_active = not user.is_active
+        user.save()
+        return {
+            "message": f"{user.username} {'解封' if user.is_active else '封号'}成功"
+        }
+    except User.DoesNotExist:
+        raise HttpError(404, "查无此人")
