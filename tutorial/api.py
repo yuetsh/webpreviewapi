@@ -2,19 +2,16 @@ from typing import List
 from ninja import Router
 from ninja.errors import HttpError
 from account.decorators import super_required
-from .schemas import TutorialAll, TutorialIn, TutorialReturn
+from .schemas import TutorialAll, TutorialIn, TutorialSlim
 from .models import Tutorial
 
 router = Router()
 
 
-@router.get("/", response=TutorialReturn)
+@router.get("/list", response=List[TutorialSlim])
 @super_required
 def tutorial(request):
-    return {
-        "list": Tutorial.objects.all(),
-        "first": Tutorial.objects.first(),
-    }
+    return Tutorial.objects.all()
 
 
 @router.get("/display", response=List[int])

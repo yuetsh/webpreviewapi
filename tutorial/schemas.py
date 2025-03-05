@@ -1,5 +1,4 @@
 from ninja import Schema, ModelSchema
-from typing import List, Optional
 from .models import Tutorial
 
 
@@ -13,11 +12,6 @@ class TutorialAll(ModelSchema):
     class Meta:
         model = Tutorial
         fields = "__all__"
-
-
-class TutorialReturn(Schema):
-    list: List[TutorialSlim]
-    first: Optional[TutorialAll]
 
 
 class TutorialIn(Schema):
