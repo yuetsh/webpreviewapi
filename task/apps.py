@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class TutorialConfig(AppConfig):
+class TaskConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "tutorial"
-    verbose_name = "教程"
+    name = "task"
+    verbose_name = "任务"
