@@ -78,13 +78,9 @@ def batch_create(request, payload: BatchUsersIn):
         usernames.append(username)
         digits = [str(random.randint(2, 9)) for _ in range(6)]
         password = "".join(digits)
-        user_list.append(
-            User(
-                username=username,
-                password=password,
-                raw_password=password,
-            )
-        )
+        user = User(username=username)
+        user.set_password(password)
+        user_list.append(user)
 
     existing_users = User.objects.filter(username__in=usernames)
     if existing_users.exists():
