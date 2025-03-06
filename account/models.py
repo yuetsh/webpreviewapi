@@ -27,3 +27,6 @@ class User(AbstractUser):
         super().set_password(raw_password)
         self.raw_password = raw_password
         self.save()
+    
+    class Meta:
+        ordering = ("-id",)
