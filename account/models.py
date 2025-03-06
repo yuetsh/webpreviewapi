@@ -27,6 +27,8 @@ class User(AbstractUser):
         super().set_password(raw_password)
         self.raw_password = raw_password
         self.save()
-    
+
     class Meta:
         ordering = ("-id",)
+        verbose_name = "用户"
+        verbose_name_plural = verbose_name
