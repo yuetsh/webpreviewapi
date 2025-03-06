@@ -86,6 +86,7 @@ def batch_create(request, payload: BatchUsersIn):
     if existing_users.exists():
         raise HttpError(400, "有些用户已经存在，创建失败")
     User.objects.bulk_create(user_list)
+    return {"message": "批量创建成功"}
 
 
 @router.put("/active/{id}")
