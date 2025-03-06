@@ -1,10 +1,16 @@
+import random
 from typing import List
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
-from ninja.pagination import paginate, PageNumberPagination
+from ninja.pagination import paginate
 from ninja.errors import HttpError
-from .schemas import UserListSchema, UserRegistrationSchema, UserLoginSchema
+from .schemas import (
+    BatchUsersIn,
+    UserListSchema,
+    UserRegistrationSchema,
+    UserLoginSchema,
+)
 from .models import RoleChoices, User
 from .decorators import super_required
 
@@ -61,9 +67,29 @@ def list(request, username: str, role: str = None):
 
 @router.post("/batch")
 @super_required
-def batch_create(request):
+def batch_create(request, payload: BatchUsersIn):
     # 批量创建账号
-    pass
+    prefix = "web"
+    user_list = []
+    usernames = []
+
+    for name in payload.names:
+        username = prefix + payload.classname + name
+        usernames.append(username)
+        digits = [str(random.randint(2, 9)) for _ in range(6)]
+        password = "".join(digits)
+        user_list.append(
+            User(
+                username=username,
+                password=password,
+                raw_password=password,
+            )
+        )
+
+    existing_users = User.objects.filter(username__in=usernames)
+    if existing_users.exists():
+        raise HttpError(400, "有些用户已经存在，创建失败")
+    User.objects.bulk_create(user_list)
 
 
 @router.put("/active/{id}")

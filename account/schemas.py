@@ -1,3 +1,4 @@
+from typing import List
 from ninja import Schema, ModelSchema
 from pydantic import EmailStr, Field
 
@@ -40,3 +41,8 @@ class UserRegistrationSchema(Schema):
 class UserLoginSchema(Schema):
     username: str
     password: str
+
+
+class BatchUsersIn(Schema):
+    names: List[str]
+    classname: str
