@@ -1,6 +1,5 @@
 import random
 from typing import List
-from django.db.models.signals import post_save
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
@@ -12,7 +11,7 @@ from .schemas import (
     UserRegistrationSchema,
     UserLoginSchema,
 )
-from .models import Profile, RoleChoices, User, create_user_profile
+from .models import RoleChoices, User
 from .decorators import super_required
 
 router = Router()
@@ -72,8 +71,6 @@ def batch_create(request, payload: BatchUsersIn):
     # 批量创建账号
     prefix = "web"
     usernames = []
-    user_list = []
-    profile_list = []
 
     for name in payload.names:
         username = prefix + payload.classname + name
@@ -87,14 +84,8 @@ def batch_create(request, payload: BatchUsersIn):
         password = "".join(digits)
         user = User(username=username)
         user.set_password(password)
-        user_list.append(user)
-        profile_list.append(Profile(user=user))
+        user.save()
 
-    # 总是报错，但是又可以创建
-    post_save.disconnect(create_user_profile, sender=User)
-    User.objects.bulk_create(user_list, ignore_conflicts=True)
-    Profile.objects.bulk_create(profile_list, ignore_conflicts=True)
-    post_save.connect(create_user_profile, sender=User)
     return {"message": "批量创建成功"}
 
 
