@@ -12,7 +12,7 @@ from .schemas import (
     UserRegistrationSchema,
     UserLoginSchema,
 )
-from .models import RoleChoices, User
+from .models import Profile, RoleChoices, User
 from .decorators import super_required
 
 router = Router()
@@ -72,6 +72,7 @@ def batch_create(request, payload: BatchUsersIn):
     # 批量创建账号
     prefix = "web"
     user_list = []
+    profile_list = []
     usernames = []
 
     for name in payload.names:
@@ -86,13 +87,15 @@ def batch_create(request, payload: BatchUsersIn):
     existing_users = User.objects.filter(username__in=usernames)
     if existing_users.exists():
         raise HttpError(400, "有些用户已经存在，创建失败")
-    
+
+    for user in user_list:
+        profile_list.append(Profile(user=user))
+
     post_save.disconnect(sender=User, dispatch_uid="1")
     User.objects.bulk_create(user_list)
     post_save.connect(sender=User, dispatch_uid="1")
-    
-    for user in user_list:
-        post_save.send(sender=User, instance=user, created=True)
+
+    Profile.objects.bulk_create(profile_list)
     return {"message": "批量创建成功"}
 
 
