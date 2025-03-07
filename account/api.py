@@ -73,25 +73,20 @@ def batch_create(request, payload: BatchUsersIn):
     prefix = "web"
     user_list = []
     profile_list = []
-    usernames = []
 
     for name in payload.names:
         username = prefix + payload.classname + name
-        usernames.append(username)
         digits = [str(random.randint(2, 9)) for _ in range(6)]
         password = "".join(digits)
         user = User(username=username)
         user.set_password(password)
         user_list.append(user)
-
-    for user in user_list:
         profile_list.append(Profile(user=user))
 
     post_save.disconnect(create_user_profile, sender=User)
     User.objects.bulk_create(user_list)
-    post_save.connect(create_user_profile, sender=User)
-
     Profile.objects.bulk_create(profile_list)
+    post_save.connect(create_user_profile, sender=User)
     return {"message": "批量创建成功"}
 
 
