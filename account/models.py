@@ -12,6 +12,9 @@ class RoleChoices(models.TextChoices):
 
 
 class User(AbstractUser):
+    first_name = None
+    last_name = None
+
     role = models.CharField(
         max_length=20,
         choices=RoleChoices.choices,

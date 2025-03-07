@@ -12,7 +12,7 @@ from .schemas import (
     UserRegistrationSchema,
     UserLoginSchema,
 )
-from .models import Profile, RoleChoices, User
+from .models import Profile, RoleChoices, User, create_user_profile
 from .decorators import super_required
 
 router = Router()
@@ -91,9 +91,9 @@ def batch_create(request, payload: BatchUsersIn):
     for user in user_list:
         profile_list.append(Profile(user=user))
 
-    post_save.disconnect(sender=User, dispatch_uid="1")
+    post_save.disconnect(create_user_profile, sender=User)
     User.objects.bulk_create(user_list)
-    post_save.connect(sender=User, dispatch_uid="1")
+    post_save.connect(create_user_profile, sender=User)
 
     Profile.objects.bulk_create(profile_list)
     return {"message": "批量创建成功"}
