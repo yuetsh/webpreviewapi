@@ -84,10 +84,6 @@ def batch_create(request, payload: BatchUsersIn):
         user.set_password(password)
         user_list.append(user)
 
-    existing_users = User.objects.filter(username__in=usernames)
-    if existing_users.exists():
-        raise HttpError(400, "有些用户已经存在，创建失败")
-
     for user in user_list:
         profile_list.append(Profile(user=user))
 
