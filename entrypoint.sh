@@ -1,4 +1,4 @@
 #!/bin/sh
 
 python manage.py migrate --noinput
-exec gunicorn api.wsgi --bind :8000 -k uvicorn.workers.UvicornWorker --workers 5 --threads 4
+exec gunicorn --bind :8000 api.wsgi -k uvicorn.workers.UvicornWorker --workers 5 --threads 4
