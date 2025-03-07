@@ -71,11 +71,18 @@ def list(request, username: str, role: str = None):
 def batch_create(request, payload: BatchUsersIn):
     # 批量创建账号
     prefix = "web"
+    usernames = []
     user_list = []
     profile_list = []
 
     for name in payload.names:
         username = prefix + payload.classname + name
+        usernames.append(username)
+    existing_users = User.objects.filter(username__in=usernames)
+    if existing_users.exists():
+        raise HttpError(400, "有些用户已经存在，创建失败")
+
+    for username in usernames:
         digits = [str(random.randint(2, 9)) for _ in range(6)]
         password = "".join(digits)
         user = User(username=username)
@@ -83,9 +90,10 @@ def batch_create(request, payload: BatchUsersIn):
         user_list.append(user)
         profile_list.append(Profile(user=user))
 
+    # 总是报错，但是又可以创建
     post_save.disconnect(create_user_profile, sender=User)
-    User.objects.bulk_create(user_list)
-    Profile.objects.bulk_create(profile_list)
+    User.objects.bulk_create(user_list, ignore_conflicts=True)
+    Profile.objects.bulk_create(profile_list, ignore_conflicts=True)
     post_save.connect(create_user_profile, sender=User)
     return {"message": "批量创建成功"}
 
