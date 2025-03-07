@@ -1,5 +1,6 @@
 import random
 from typing import List
+from django.db.models.signals import post_save
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from ninja import Router
@@ -85,7 +86,13 @@ def batch_create(request, payload: BatchUsersIn):
     existing_users = User.objects.filter(username__in=usernames)
     if existing_users.exists():
         raise HttpError(400, "有些用户已经存在，创建失败")
+    
+    post_save.disconnect(sender=User, dispatch_uid="1")
     User.objects.bulk_create(user_list)
+    post_save.connect(sender=User, dispatch_uid="1")
+    
+    for user in user_list:
+        post_save.send(sender=User, instance=user, created=True)
     return {"message": "批量创建成功"}
 
 
