@@ -1,4 +1,4 @@
 #!/bin/sh
 
 python manage.py migrate --noinput
-exec gunicorn -w 5  -k uvicorn.workers.UvicornWorker api.asgi:application
+exec gunicorn --bind 0.0.0.0:8000 api.asgi:application -k uvicorn.workers.UvicornWorker -w 5
