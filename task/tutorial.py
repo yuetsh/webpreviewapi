@@ -24,7 +24,7 @@ def get(request, display: int):
     try:
         return Tutorial.objects.get(display=display)
     except Tutorial.DoesNotExist:
-        raise HttpError(404, "此序号无教程")
+        return HttpError(404, "此序号无教程")
 
 
 @router.post("/")
@@ -52,7 +52,7 @@ def toggle_public(request, display: int):
         label = "公开" if item.is_public else "隐藏"
         return {"message": f"【{item.display}】{item.title} 已{label}"}
     except Tutorial.DoesNotExist:
-        raise HttpError(404, "此序号无教程")
+        return HttpError(404, "此序号无教程")
 
 
 @router.delete("/{display}")

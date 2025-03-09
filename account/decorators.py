@@ -11,12 +11,12 @@ def _require(roles):
         @wraps(func)
         def wrapper(request, *args, **kwargs):
             if not request.user.is_authenticated:
-                raise HttpError(401, "用户未登录")
+                return HttpError(401, "用户未登录")
             try:
                 if request.user.role not in roles:
-                    raise HttpError(403, "你没有权限")
+                    return HttpError(403, "你没有权限")
             except User.DoesNotExist:
-                raise HttpError(404, "用户不存在")
+                return HttpError(404, "用户不存在")
             return func(request, *args, **kwargs)
 
         return wrapper

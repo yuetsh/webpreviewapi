@@ -20,7 +20,7 @@ router = Router()
 @router.post("/register")
 def user_register(request, payload: UserRegistrationSchema):
     if User.objects.filter(username=payload.username).exists():
-        raise HttpError(400, "用户已存在")
+        return HttpError(400, "用户已存在")
     User.objects.create_user(
         username=payload.username,
         email=payload.email,
@@ -36,13 +36,14 @@ def user_login(request, payload: UserLoginSchema):
         login(request, user)
         return {"username": user.username, "role": user.role}
     else:
-        raise HttpError(401, "账号密码错误")
+        return HttpError(401, "账号密码错误")
 
 
 @router.post("/logout")
 @login_required
 def user_logout(request):
     logout(request)
+    return {"message": "退出成功"}
 
 
 @router.get("/profile")
@@ -77,7 +78,7 @@ def batch_create(request, payload: BatchUsersIn):
         usernames.append(username)
     existing_users = User.objects.filter(username__in=usernames)
     if existing_users.exists():
-        raise HttpError(400, "有些用户已经存在，创建失败")
+        return HttpError(400, "有些用户已经存在，创建失败")
 
     for username in usernames:
         digits = [str(random.randint(2, 9)) for _ in range(6)]
@@ -101,4 +102,4 @@ def toggle_user_is_active(request, id: int):
             "message": f"{user.username} {'解封' if user.is_active else '封号'}成功"
         }
     except User.DoesNotExist:
-        raise HttpError(404, "查无此人")
+        return HttpError(404, "查无此人")
