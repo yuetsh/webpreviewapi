@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "ninja",
     "corsheaders",
     "django_extensions",
+    "django_dbconn_retry",
     "account",
     "task",
     "submission",
