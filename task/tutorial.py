@@ -20,11 +20,11 @@ def get_all_public_display(request):
 
 
 @router.get("/{display}", response=TutorialAll)
-def get(request, display: int):
+async def get(request, display: int):
     try:
-        return Tutorial.objects.get(display=display)
+        return await Tutorial.objects.aget(display=display)
     except Tutorial.DoesNotExist:
-        return HttpError(404, "此序号无教程")
+        raise HttpError(404, "此序号无教程")
 
 
 @router.post("/")
@@ -35,7 +35,7 @@ def create_or_update(request, payload: TutorialIn):
         item.title = payload.title
         item.content = payload.content
         item.is_public = payload.is_public
-        item.save()
+        item.asave()
         return {"message": "更新成功"}
     except Tutorial.DoesNotExist:
         Tutorial.objects.create(**payload.dict())
@@ -48,11 +48,11 @@ def toggle_public(request, display: int):
     try:
         item = Tutorial.objects.get(display=display)
         item.is_public = not item.is_public
-        item.save()
+        item.asave()
         label = "公开" if item.is_public else "隐藏"
         return {"message": f"【{item.display}】{item.title} 已{label}"}
     except Tutorial.DoesNotExist:
-        return HttpError(404, "此序号无教程")
+        raise HttpError(404, "此序号无教程")
 
 
 @router.delete("/{display}")

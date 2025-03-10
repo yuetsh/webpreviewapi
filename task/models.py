@@ -8,7 +8,7 @@ class Task(TimeStampedModel):
         ("tutorial", "Tutorial"),
     ]
 
-    display = models.IntegerField(unique=True)
+    display = models.IntegerField(unique=True, db_index=True)
     title = models.CharField(max_length=100)
     content = models.TextField()
     task_type = models.CharField(
