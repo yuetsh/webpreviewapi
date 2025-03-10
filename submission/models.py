@@ -11,10 +11,10 @@ from task.models import Task
 class Submission(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
-    score = models.IntegerField(default=0)
-    html = models.TextField(null=True, blank=True)
-    css = models.TextField(null=True, blank=True)
-    js = models.TextField(null=True, blank=True)
+    score = models.IntegerField(default=0, verbose_name="分数")
+    html = models.TextField(null=True, blank=True, verbose_name="HTML代码")
+    css = models.TextField(null=True, blank=True, verbose_name="CSS代码")
+    js = models.TextField(null=True, blank=True, verbose_name="JS代码")
 
     def __str__(self):
         return f"{self.user.username} - {self.task.title}"

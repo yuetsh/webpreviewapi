@@ -8,15 +8,13 @@ class Task(TimeStampedModel):
         ("tutorial", "Tutorial"),
     ]
 
-    display = models.IntegerField(unique=True, db_index=True)
-    title = models.CharField(max_length=100)
-    content = models.TextField()
+    display = models.IntegerField(unique=True, db_index=True, verbose_name="序号")
+    title = models.CharField(max_length=100, verbose_name="标题")
+    content = models.TextField(verbose_name="内容")
     task_type = models.CharField(
-        max_length=20,
-        choices=TASK_TYPE_CHOICES,
-        editable=False,
+        max_length=20, choices=TASK_TYPE_CHOICES, editable=False, verbose_name="类型"
     )
-    is_public = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=False, verbose_name="是否公开")
 
     def save(self, *args, **kwargs):
         if not self.task_type:
