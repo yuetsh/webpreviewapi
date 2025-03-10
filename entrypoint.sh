@@ -1,4 +1,5 @@
 #!/bin/sh
 
+python manage.py createcachetable
 python manage.py migrate --noinput
-exec gunicorn --bind 0.0.0.0:8000 api.wsgi:application -w 5
+exec gunicorn --bind 0.0.0.0:8000 api.asgi:application -k uvicorn.workers.UvicornWorker -w 5

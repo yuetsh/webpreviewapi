@@ -105,10 +105,19 @@ PROD_DATABASES = {
     },
 }
 
+PROD_CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "webpreview_api_cache",
+    }
+}
+
 if DEBUG:
     DATABASES = DEV_DATABASES
 else:
     DATABASES = PROD_DATABASES
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    CACHES = PROD_CACHES
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
