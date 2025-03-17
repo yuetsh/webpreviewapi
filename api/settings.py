@@ -101,7 +101,7 @@ PROD_DATABASES = {
         "NAME": os.getenv("POSTGRES_DB"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": os.getenv("POSTGRES_HOST"),
+        "HOST": os.getenv("POSTGRES_HOST", "pgbouncer"),
         "PORT": "5432",
         # 由于使用了 PgBouncer，这里不需要保持长连接
         "CONN_MAX_AGE": 0,
