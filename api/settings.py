@@ -95,50 +95,51 @@ DEV_DATABASES = {
     }
 }
 
-PROD_DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB"),
-        "USER": os.getenv("POSTGRES_USER"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": os.getenv("POSTGRES_HOST", "pgbouncer"),
-        "PORT": "5432",
-        # 由于使用了 PgBouncer，这里不需要保持长连接
-        "CONN_MAX_AGE": 0,
-        "OPTIONS": {
-            "application_name": "webpreview",  # 便于在数据库中识别应用
-            "sslmode": "disable",  # PgBouncer 不支持 SSL
-        },
-    },
-}
+# PROD_DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": os.getenv("POSTGRES_DB"),
+#         "USER": os.getenv("POSTGRES_USER"),
+#         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+#         "HOST": os.getenv("POSTGRES_HOST"),
+#         "PORT": "5432",
+#         # 由于使用了 PgBouncer，这里不需要保持长连接
+#         "CONN_MAX_AGE": 0,
+#         "OPTIONS": {
+#             "application_name": "webpreview",  # 便于在数据库中识别应用
+#             "sslmode": "disable",  # PgBouncer 不支持 SSL
+#         },
+#     },
+# }
 
-PROD_CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 50},
-            "SOCKET_CONNECT_TIMEOUT": 5,  # 连接超时时间
-            "SOCKET_TIMEOUT": 5,  # 读写超时时间
-            "RETRY_ON_TIMEOUT": True,  # 超时时重试
-            "MAX_CONNECTIONS": 1000,  # 连接池最大连接数
-            "HEALTH_CHECK_INTERVAL": 30,  # 健康检查间隔
-        },
-    }
-}
+# PROD_CACHES = {
+#     "default": {
+#         "BACKEND": "django.core.cache.backends.redis.RedisCache",
+#         "LOCATION": os.getenv("REDIS_URL"),
+#         "OPTIONS": {
+#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#             "CONNECTION_POOL_KWARGS": {"max_connections": 50},
+#             "SOCKET_CONNECT_TIMEOUT": 5,  # 连接超时时间
+#             "SOCKET_TIMEOUT": 5,  # 读写超时时间
+#             "RETRY_ON_TIMEOUT": True,  # 超时时重试
+#             "MAX_CONNECTIONS": 1000,  # 连接池最大连接数
+#             "HEALTH_CHECK_INTERVAL": 30,  # 健康检查间隔
+#         },
+#     }
+# }
 
 if DEBUG:
     DATABASES = DEV_DATABASES
 else:
-    DATABASES = PROD_DATABASES
-    # 使用 Redis 作为会话存储
-    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-    SESSION_CACHE_ALIAS = "default"
-    # 设置会话过期时间（24小时）
-    SESSION_COOKIE_AGE = 86400
-    # 配置缓存
-    CACHES = PROD_CACHES
+    DATABASES = DEV_DATABASES
+    # DATABASES = PROD_DATABASES
+    # # 使用 Redis 作为会话存储
+    # SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    # SESSION_CACHE_ALIAS = "default"
+    # # 设置会话过期时间（24小时）
+    # SESSION_COOKIE_AGE = 86400
+    # # 配置缓存
+    # CACHES = PROD_CACHES
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
