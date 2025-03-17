@@ -101,7 +101,7 @@ PROD_DATABASES = {
         "NAME": os.getenv("POSTGRES_DB"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": os.getenv("POSTGRES_HOST", "pgbouncer"),
+        "HOST": os.getenv("POSTGRES_HOST"),
         "PORT": "5432",
         # 由于使用了 PgBouncer，这里不需要保持长连接
         "CONN_MAX_AGE": 0,
@@ -115,7 +115,7 @@ PROD_DATABASES = {
 PROD_CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://webpreview-redis:6379/1"),
+        "LOCATION": os.getenv("REDIS_URL"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "CONNECTION_POOL_KWARGS": {"max_connections": 50},
