@@ -35,7 +35,7 @@ def create_or_update(request, payload: TutorialIn):
         item.title = payload.title
         item.content = payload.content
         item.is_public = payload.is_public
-        item.asave()
+        item.save()
         return {"message": "更新成功"}
     except Tutorial.DoesNotExist:
         Tutorial.objects.create(**payload.dict())
@@ -48,7 +48,7 @@ def toggle_public(request, display: int):
     try:
         item = Tutorial.objects.get(display=display)
         item.is_public = not item.is_public
-        item.asave()
+        item.save()
         label = "公开" if item.is_public else "隐藏"
         return {"message": f"【{item.display}】{item.title} 已{label}"}
     except Tutorial.DoesNotExist:
