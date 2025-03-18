@@ -70,6 +70,7 @@ def list(request, username: str, role: str = None):
 @super_required
 def batch_create(request, payload: BatchUsersIn):
     # 批量创建账号
+    # TODO 这里需要改成 bulk_create
     prefix = "web"
     usernames = []
 
