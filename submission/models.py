@@ -11,7 +11,6 @@ class Submission(TimeStampedModel):
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
-        unique=True,
     )
     user = models.ForeignKey(
         User,
