@@ -51,6 +51,10 @@ class Profile(models.Model):
     def __str__(self):
         return self.user.username
 
+    def update_total_score(self, score: int):
+        self.total_score = self.total_score + score
+        self.save()
+
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):

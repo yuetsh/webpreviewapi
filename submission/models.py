@@ -1,7 +1,5 @@
+import uuid
 from django.db import models
-from django.db.models import Sum
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django_extensions.db.models import TimeStampedModel
 
 from account.models import Profile, User
@@ -9,12 +7,28 @@ from task.models import Task
 
 
 class Submission(TimeStampedModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="my_submissions",
+    )
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
     score = models.IntegerField(default=0, verbose_name="分数")
+    referee = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="referee_submissions",
+        verbose_name="打分人",
+    )
     html = models.TextField(null=True, blank=True, verbose_name="HTML代码")
     css = models.TextField(null=True, blank=True, verbose_name="CSS代码")
     js = models.TextField(null=True, blank=True, verbose_name="JS代码")
+
+    class Meta:
+        ordering = ("-created",)
 
     def __str__(self):
         return f"{self.user.username} - {self.task.title}"
@@ -27,21 +41,5 @@ class Submission(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self.user.profile.update_total_score()
-
-
-# 信号处理函数
-@receiver(post_save, sender=Submission)
-def update_user_score(sender, instance, **kwargs):
-    """
-    当 Submission 保存后，自动更新用户的总分
-    """
-    total_score = (
-        Submission.objects.filter(user=instance.user).aggregate(
-            total_score=Sum("score")
-        )["total_score"]
-        or 0
-    )
-    profile, created = Profile.objects.get_or_create(user=instance.user)
-    profile.total_score = total_score
-    profile.save()
+        if self.score > 0:
+            self.user.profile.update_total_score(self.score)

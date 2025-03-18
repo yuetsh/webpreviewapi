@@ -6,8 +6,8 @@ from .models import User, RoleChoices
 
 
 class UserListSchema(ModelSchema):
-    @classmethod
-    def from_orm(cls, obj):
+    @staticmethod
+    def get(cls, obj):
         raw_password = obj.raw_password if obj.role == RoleChoices.NORMAL else ""
         return cls(
             id=obj.id,

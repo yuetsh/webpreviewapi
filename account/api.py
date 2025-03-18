@@ -63,7 +63,7 @@ def list(request, username: str, role: str = None):
     users = User.objects.filter(username__icontains=username)
     if role:
         users = users.filter(role=role)
-    return [UserListSchema.from_orm(user) for user in users]
+    return [UserListSchema.get(user) for user in users]
 
 
 @router.post("/batch")

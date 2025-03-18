@@ -2,17 +2,20 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 
 
-class Task(TimeStampedModel):
-    TASK_TYPE_CHOICES = [
-        ("challenge", "Challenge"),
-        ("tutorial", "Tutorial"),
-    ]
+class TaskTypeChoices(models.TextChoices):
+    CHALLENGE = "challenge", "挑战"
+    TUTORIAL = "tutorial", "教程"
 
+
+class Task(TimeStampedModel):
     display = models.IntegerField(unique=True, db_index=True, verbose_name="序号")
     title = models.CharField(max_length=100, verbose_name="标题")
     content = models.TextField(verbose_name="内容")
     task_type = models.CharField(
-        max_length=20, choices=TASK_TYPE_CHOICES, editable=False, verbose_name="类型"
+        max_length=20,
+        choices=TaskTypeChoices.choices,
+        editable=False,
+        verbose_name="类型",
     )
     is_public = models.BooleanField(default=False, verbose_name="是否公开")
 

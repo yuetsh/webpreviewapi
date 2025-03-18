@@ -23,6 +23,7 @@ api = NinjaAPI()
 
 api.add_router("account/", "account.api.router")
 api.add_router("tutorial/", "task.tutorial.router")
+api.add_router("submission/", "submission.api.router")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
