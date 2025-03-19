@@ -17,7 +17,8 @@ class SubmissionOut(Schema):
     task_id: int
     task_title: str
     task_type: Literal["tutorial", "challenge"]
-    score: int
+    score: float
+    my_score: int
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
@@ -25,7 +26,7 @@ class SubmissionOut(Schema):
     modified: str
 
     @staticmethod
-    def list(submission):
+    def list(submission, rating_dict):
         return {
             "id": submission.id,
             "userid": submission.user.id,
@@ -34,12 +35,13 @@ class SubmissionOut(Schema):
             "task_title": submission.task.title,
             "task_type": submission.task.task_type,
             "score": submission.score,
+            "my_score": rating_dict.get(submission.id, 0),
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
 
     @staticmethod
-    def get(submission):
+    def get(submission, rating):
         return {
             "id": submission.id,
             "userid": submission.user.id,
@@ -48,6 +50,7 @@ class SubmissionOut(Schema):
             "task_title": submission.task.title,
             "task_type": submission.task.task_type,
             "score": submission.score,
+            "my_score": rating.score if rating else 0,
             "html": submission.html,
             "css": submission.css,
             "js": submission.js,
@@ -56,13 +59,13 @@ class SubmissionOut(Schema):
         }
 
 
-class SubmissionScoreIn(Schema):
+class RatingScoreIn(Schema):
     score: int
 
 
 class SubmissionScoreOut(Schema):
     id: UUID
-    score: int
+    score: float
 
 
 class SubmissionFilter(Schema):

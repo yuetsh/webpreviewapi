@@ -11,12 +11,12 @@ from .schemas import (
     SubmissionFilter,
     SubmissionIn,
     SubmissionOut,
-    SubmissionScoreIn,
+    RatingScoreIn,
     SubmissionScoreOut,
 )
 
 
-from .models import Submission
+from .models import Rating, Submission
 from task.models import Task
 from account.models import RoleChoices
 
@@ -42,20 +42,25 @@ def create_submission(request, payload: SubmissionIn):
 
 @router.get("/", response=List[SubmissionOut])
 @paginate
+@login_required
 def list_submissions(request, filters: SubmissionFilter = Query(...)):
     """
     获取提交列表，支持按任务和用户过滤
     """
-    queryset = Submission.objects.all()
+    submissions = Submission.objects.all()
 
     if filters.task_id:
-        queryset = queryset.filter(task_id=filters.task_id)
+        submissions = submissions.filter(task_id=filters.task_id)
     if filters.task_id:
-        queryset = queryset.filter(task_task_type=filters.task_type)
+        submissions = submissions.filter(task_task_type=filters.task_type)
     if filters.username:
-        queryset = queryset.filter(user_username=filters.username)
+        submissions = submissions.filter(user_username=filters.username)
 
-    return [SubmissionOut.list(submission) for submission in queryset]
+    ratings = Rating.objects.select_related("user", "submission").filter(
+        user=request.user, submission__in=submissions
+    )
+    rating_dict = {rating.submission_id: rating.score for rating in ratings}
+    return [SubmissionOut.list(submission, rating_dict) for submission in submissions]
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
@@ -64,18 +69,18 @@ def get_submission(request, submission_id: UUID):
     """
     获取单个提交的详细信息
     """
-    # 如果是普通用户，只能查看自己的提交
-    if request.user.role == RoleChoices.NORMAL:
-        submission = get_object_or_404(Submission, id=submission_id, user=request.user)
-    else:
-        submission = get_object_or_404(Submission, id=submission_id)
+    submission = get_object_or_404(Submission, id=submission_id)
+    rating = (
+        Rating.objects.select_related("user", "submission")
+        .filter(user=request.user, submission=submission)
+        .first()
+    )
+    return SubmissionOut.get(submission, rating)
 
-    return SubmissionOut.get(submission)
 
-
-@router.put("/{submission_id}/score", response=SubmissionScoreOut)
-@admin_required
-def update_score(request, submission_id: UUID, payload: SubmissionScoreIn):
+@router.put("/{submission_id}/score")
+@login_required
+def update_score(request, submission_id: UUID, payload: RatingScoreIn):
     """
     给提交打分
     """
@@ -84,19 +89,13 @@ def update_score(request, submission_id: UUID, payload: SubmissionScoreIn):
 
     submission = get_object_or_404(Submission, id=submission_id)
 
-    if submission.score > 0:
-        raise HttpError(400, "该提交已经有分数了")
-    if (
-        request.user.role == RoleChoices.NORMAL
-        and submission.user.id == request.user.id
-    ):
-        raise HttpError(400, "不能自己给自己打分")
+    _, created = Rating.objects.get_or_create(
+        user=request.user,
+        submission=submission,
+        defaults={"score": payload.score},
+    )
 
-    submission.score = payload.score
-    submission.referee = request.user
-    submission.save()
-
-    return {
-        "id": submission.id,
-        "score": submission.score,
-    }
+    if created:
+        return {"message": "打分成功"}
+    else:
+        return {"message": "你已经给这个提交打过分了"}
