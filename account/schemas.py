@@ -8,7 +8,7 @@ from .models import User, RoleChoices
 class UserListSchema(ModelSchema):
     @classmethod
     def get(cls, obj):
-        raw_password = obj.raw_password if obj.role == RoleChoices.NORMAL else ""
+        raw_password = obj.raw_password if obj.role != RoleChoices.SUPER else ""
         return cls(
             id=obj.id,
             username=obj.username,
