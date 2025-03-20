@@ -12,13 +12,12 @@ from .schemas import (
     SubmissionIn,
     SubmissionOut,
     RatingScoreIn,
-    SubmissionScoreOut,
 )
 
 
 from .models import Rating, Submission
 from task.models import Task
-from account.models import RoleChoices
+from account.models import User
 
 router = Router()
 
@@ -50,11 +49,14 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     submissions = Submission.objects.all()
 
     if filters.task_id:
-        submissions = submissions.filter(task_id=filters.task_id)
-    if filters.task_id:
-        submissions = submissions.filter(task_task_type=filters.task_type)
+        task = get_object_or_404(Task, id=filters.task_id)
+        submissions = submissions.select_related("task").filter(task=task)
+    if filters.task_type:
+        tasks = Task.objects.filter(task_type=filters.task_type)
+        submissions = submissions.select_related("task").filter(task__in=tasks)
     if filters.username:
-        submissions = submissions.filter(user_username=filters.username)
+        users = User.objects.filter(username__icontains=filters.username)
+        submissions = submissions.select_related("user").filter(user__in=users)
 
     ratings = Rating.objects.select_related("user", "submission").filter(
         user=request.user, submission__in=submissions
