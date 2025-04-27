@@ -112,12 +112,6 @@ PROD_CACHES = {
         "LOCATION": os.getenv("REDIS_URL"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 50},
-            "SOCKET_CONNECT_TIMEOUT": 5,  # 连接超时时间
-            "SOCKET_TIMEOUT": 5,  # 读写超时时间
-            "RETRY_ON_TIMEOUT": True,  # 超时时重试
-            "MAX_CONNECTIONS": 1000,  # 连接池最大连接数
-            "HEALTH_CHECK_INTERVAL": 30,  # 健康检查间隔
         },
     }
 }
@@ -130,8 +124,6 @@ else:
     # 使用 Redis 作为会话存储
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
     SESSION_CACHE_ALIAS = "default"
-    # 设置会话过期时间（24小时）
-    SESSION_COOKIE_AGE = 86400
     # 配置缓存
     CACHES = PROD_CACHES
 
