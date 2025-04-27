@@ -29,9 +29,10 @@ class User(AbstractUser):
     )
 
     def save(self, *args, **kwargs):
-        if self.is_superuser:
-            self.role = RoleChoices.SUPER
-        super().save(*args, **kwargs)
+        if self.username:
+            if self.is_superuser:
+                self.role = RoleChoices.SUPER
+            super().save(*args, **kwargs)
 
     def set_password(self, raw_password):
         super().set_password(raw_password)
