@@ -15,6 +15,7 @@ class SubmissionOut(Schema):
     userid: int
     username: str
     task_id: int
+    task_display: int
     task_title: str
     task_type: Literal["tutorial", "challenge"]
     score: float
@@ -32,6 +33,7 @@ class SubmissionOut(Schema):
             "userid": submission.user.id,
             "username": submission.user.username,
             "task_id": submission.task.id,
+            "task_display": submission.task.display,
             "task_title": submission.task.title,
             "task_type": submission.task.task_type,
             "score": submission.score,
@@ -47,6 +49,7 @@ class SubmissionOut(Schema):
             "userid": submission.user.id,
             "username": submission.user.username,
             "task_id": submission.task.id,
+            "task_display": submission.task.display,
             "task_title": submission.task.title,
             "task_type": submission.task.task_type,
             "score": submission.score,
