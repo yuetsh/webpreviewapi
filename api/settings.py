@@ -33,8 +33,8 @@ if DEBUG:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 else:
-    ALLOWED_HOSTS = ["web.xuyue.cc"]
-    CSRF_TRUSTED_ORIGINS = ["https://web.xuyue.cc"]
+    ALLOWED_HOSTS = ["web.xuyue.cc", "10.13.114.114"]
+    CSRF_TRUSTED_ORIGINS = ["https://web.xuyue.cc", "http://10.13.114.114"]
 
 # Application definition
 
