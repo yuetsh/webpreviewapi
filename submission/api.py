@@ -6,7 +6,7 @@ from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 
-from account.decorators import admin_required
+
 from .schemas import (
     SubmissionFilter,
     SubmissionIn,
@@ -46,22 +46,26 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     """
     获取提交列表，支持按任务和用户过滤
     """
-    submissions = Submission.objects.all()
+    submissions = Submission.objects.select_related("task", "user")
 
     if filters.task_id:
         task = get_object_or_404(Task, id=filters.task_id)
-        submissions = submissions.select_related("task").filter(task=task)
-    if filters.task_type:
-        tasks = Task.objects.filter(task_type=filters.task_type)
-        submissions = submissions.select_related("task").filter(task__in=tasks)
+        submissions = submissions.filter(task=task)
+    elif filters.task_type:
+        submissions = submissions.filter(task__task_type=filters.task_type)
     if filters.username:
-        users = User.objects.filter(username__icontains=filters.username)
-        submissions = submissions.select_related("user").filter(user__in=users)
+        submissions = submissions.filter(user__username__icontains=filters.username)
 
-    ratings = Rating.objects.select_related("user", "submission").filter(
-        user=request.user, submission__in=submissions
+    submissions = submissions.prefetch_related("ratings").filter(
+        ratings__user=request.user
     )
-    rating_dict = {rating.submission_id: rating.score for rating in ratings}
+
+    rating_dict = {
+        submission.id: submission.ratings.first().score
+        for submission in submissions
+        if submission.ratings.exists()
+    }
+
     return [SubmissionOut.list(submission, rating_dict) for submission in submissions]
 
 
