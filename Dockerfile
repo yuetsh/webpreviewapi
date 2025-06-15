@@ -36,6 +36,11 @@ COPY . .
 RUN chown -R appuser:appuser /app \
     && chmod +x /app/entrypoint.sh
 
+# 在最终阶段，创建必要的目录并设置权限
+RUN mkdir -p /app/media \
+    && chown -R appuser:appuser /app/media \
+    && chmod 755 /app/media
+
 # 切换到非root用户
 USER appuser
 

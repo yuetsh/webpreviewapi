@@ -184,6 +184,5 @@ NINJA_PAGINATION_CLASS = "ninja.pagination.PageNumberPagination"
 
 NINJA_PAGINATION_PER_PAGE = 10
 
-# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

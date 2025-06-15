@@ -15,6 +15,12 @@ python manage.py collectstatic --noinput
 # 计算worker数量 (CPU核心数 * 2 + 1)
 WORKERS=$(python -c 'import multiprocessing; print(multiprocessing.cpu_count() * 2 + 1)')
 
+# 确保媒体目录存在并有正确的权限
+echo "Setting up media directory..."
+mkdir -p /app/media
+chown -R appuser:appuser /app/media
+chmod 755 /app/media
+
 # 启动 Gunicorn
 echo "Starting Gunicorn with $WORKERS workers..."
 exec gunicorn api.asgi:application \
