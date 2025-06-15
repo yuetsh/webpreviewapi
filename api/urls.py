@@ -17,6 +17,8 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from ninja import NinjaAPI
 
 api = NinjaAPI()
@@ -24,8 +26,12 @@ api = NinjaAPI()
 api.add_router("account/", "account.api.router")
 api.add_router("tutorial/", "task.tutorial.router")
 api.add_router("submission/", "submission.api.router")
+api.add_router("upload/", "utils.upload.router")
 
-urlpatterns = [
+
+apis = [
     path("admin/", admin.site.urls),
     path("api/", api.urls),
 ]
+
+urlpatterns = apis + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

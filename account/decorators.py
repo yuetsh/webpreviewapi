@@ -1,28 +1,28 @@
-from ninja.errors import HttpError
 from ninja import NinjaAPI
 from functools import wraps
+from typing import Callable, List, Any
+from django.http import HttpRequest
+from django.contrib.auth.decorators import login_required, user_passes_test
 from .models import User, RoleChoices
 
 api = NinjaAPI()
 
 
-def _require(roles):
-    def decorator(func):
+def _require(roles: List[RoleChoices]) -> Callable:
+    def check_role(user: User) -> bool:
+        return user.is_authenticated and hasattr(user, "role") and user.role in roles
+
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(request, *args, **kwargs):
-            if not request.user.is_authenticated:
-                raise HttpError(401, "用户未登录")
-            try:
-                if request.user.role not in roles:
-                    raise HttpError(403, "你没有权限")
-            except User.DoesNotExist:
-                raise HttpError(404, "用户不存在")
+        @login_required
+        @user_passes_test(check_role, login_url=None)
+        def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
             return func(request, *args, **kwargs)
 
         return wrapper
 
     return decorator
 
-admin_required =  _require([RoleChoices.ADMIN, RoleChoices.SUPER])
 
+admin_required = _require([RoleChoices.ADMIN, RoleChoices.SUPER])
 super_required = _require([RoleChoices.SUPER])
