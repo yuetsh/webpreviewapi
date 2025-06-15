@@ -2,6 +2,10 @@ FROM python:3.12-slim as builder
 
 WORKDIR /app
 
+# 配置apt使用国内镜像源
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+
 # 安装构建依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -18,6 +22,10 @@ RUN pip config set global.index-url https://mirrors.ustc.edu.cn/pypi/web/simple 
 FROM python:3.12-slim
 
 WORKDIR /app
+
+# 配置apt使用国内镜像源
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 
 # 创建非root用户
 RUN useradd -m -u 1000 appuser
