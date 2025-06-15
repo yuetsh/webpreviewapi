@@ -13,8 +13,17 @@ from .schemas import (
 )
 from .models import RoleChoices, User
 from .decorators import super_required
+from django.db import transaction
+import secrets
+import string
 
 router = Router()
+
+
+def generate_password(length=6):
+    """生成更安全的随机密码"""
+    alphabet = string.digits[2:]  # 只使用2-9的数字
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 @router.post("/register")
@@ -68,26 +77,33 @@ def list(request, username: str, role: str = None):
 
 @router.post("/batch")
 @super_required
+@transaction.atomic
 def batch_create(request, payload: BatchUsersIn):
-    # 批量创建账号
-    # TODO 这里需要改成 bulk_create
     prefix = "web"
     usernames = []
+    users_to_create = []
 
+    # 生成用户名列表
     for name in payload.names:
         username = prefix + payload.classname + name
         usernames.append(username)
+
+    # 检查是否存在重复用户名
     existing_users = User.objects.filter(username__in=usernames)
     if existing_users.exists():
         raise HttpError(400, "有些用户已经存在，创建失败")
 
+    # 批量创建用户
     for username in usernames:
-        digits = [str(random.randint(2, 9)) for _ in range(6)]
-        password = "".join(digits)
+        password = generate_password()
         user = User(username=username)
         user.set_password(password)
-        user.save()
+        users_to_create.append(user)
 
+    # 使用 bulk_create 批量保存
+    User.objects.bulk_create(users_to_create, ignore_conflicts=True)
+
+    # 返回创建的用户信息
     return {"message": "批量创建成功"}
 
 
