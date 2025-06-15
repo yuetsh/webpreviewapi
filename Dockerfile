@@ -22,9 +22,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 创建非root用户
-RUN useradd -m -u 1000 appuser
-
 # 从builder阶段复制Python包
 COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
@@ -34,12 +31,7 @@ COPY . .
 
 # 创建media目录并设置权限
 RUN mkdir -p /app/media \
-    && chown -R appuser:appuser /app \
-    && chmod -R 755 /app/media \
     && chmod +x /app/entrypoint.sh
-
-# 切换到非root用户
-USER appuser
 
 EXPOSE 8000
 
