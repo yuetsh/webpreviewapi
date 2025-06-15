@@ -29,9 +29,7 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # 复制应用代码
 COPY . .
 
-# 创建media目录并设置权限
-RUN mkdir -p /app/media \
-    && chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
