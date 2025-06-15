@@ -1,6 +1,5 @@
 from typing import List
 from ninja import Router
-from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from account.decorators import super_required
 from .schemas import TutorialAll, TutorialIn, TutorialSlim
