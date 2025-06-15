@@ -32,8 +32,10 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # 复制应用代码
 COPY . .
 
-# 设置权限
-RUN chown -R appuser:appuser /app \
+# 创建media目录并设置权限
+RUN mkdir -p /app/media \
+    && chown -R appuser:appuser /app \
+    && chmod -R 755 /app/media \
     && chmod +x /app/entrypoint.sh
 
 # 切换到非root用户
