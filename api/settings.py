@@ -27,9 +27,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("ENV") != "production"
+DEBUG = True
 
-if DEBUG:
+DEV = os.getenv("ENV") != "production"
+
+if DEV:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 else:
@@ -116,7 +118,7 @@ PROD_CACHES = {
     }
 }
 
-if DEBUG:
+if DEV:
     DATABASES = DEV_DATABASES
 else:
     # DATABASES = DEV_DATABASES
@@ -173,7 +175,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "account.User"
 
-if DEBUG:
+if DEV:
     CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
 else:
     CORS_ALLOWED_ORIGINS = ["https://web.xuyue.cc"]
