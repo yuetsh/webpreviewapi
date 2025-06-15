@@ -17,7 +17,6 @@ from .schemas import (
 
 from .models import Rating, Submission
 from task.models import Task
-from account.models import User
 
 router = Router()
 
@@ -56,17 +55,19 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     if filters.username:
         submissions = submissions.filter(user__username__icontains=filters.username)
 
-    submissions = submissions.prefetch_related("ratings").filter(
-        ratings__user=request.user
-    )
-
-    rating_dict = {
-        submission.id: submission.ratings.first().score
-        for submission in submissions
-        if submission.ratings.exists()
+    # 获取所有提交
+    submissions = submissions.prefetch_related("ratings")
+    
+    # 获取当前用户的评分
+    user_ratings = {
+        rating.submission_id: rating.score
+        for rating in Rating.objects.filter(
+            user=request.user,
+            submission__in=submissions
+        )
     }
 
-    return [SubmissionOut.list(submission, rating_dict) for submission in submissions]
+    return [SubmissionOut.list(submission, user_ratings) for submission in submissions]
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
