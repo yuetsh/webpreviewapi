@@ -41,6 +41,8 @@ else:
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
+    "channels",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -53,6 +55,7 @@ INSTALLED_APPS = [
     "account",
     "task",
     "submission",
+    "chat",
 ]
 
 MIDDLEWARE = [
@@ -85,7 +88,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "api.wsgi.application"
-
+ASGI_APPLICATION = "api.asgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -128,6 +131,16 @@ else:
     SESSION_CACHE_ALIAS = "default"
     # 配置缓存
     CACHES = PROD_CACHES
+
+    # WebSocket 的缓存
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [(os.getenv("REDIS_HOST"), 6379)],
+            },
+        },
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
