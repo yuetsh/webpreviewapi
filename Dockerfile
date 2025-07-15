@@ -1,4 +1,4 @@
-FROM python:3.12-slim as builder
+FROM python:3.13-slim as builder
 
 WORKDIR /app
 
@@ -18,12 +18,12 @@ RUN pip config set global.index-url https://mirrors.ustc.edu.cn/pypi/web/simple 
     && pip install --no-cache-dir -r requirements.txt
 
 # 最终阶段
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
 # 从builder阶段复制Python包
-COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
+COPY --from=builder /usr/local/lib/python3.13/site-packages/ /usr/local/lib/python3.13/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # 复制应用代码
