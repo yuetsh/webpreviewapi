@@ -101,6 +101,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/bf/4799809715225d19928147d59fda0d3a4129da055b59a9b3e35aa6223f52/channels-4.2.2-py3-none-any.whl", hash = "sha256:ff36a6e1576cacf40bcdc615fa7aece7a709fc4fdd2dc87f2971f4061ffdaa81", size = 31048, upload-time = "2025-03-30T14:59:18.969Z" },
 ]
 
+[package.optional-dependencies]
+daphne = [
+    { name = "daphne" },
+]
+
 [[package]]
 name = "channels-redis"
 version = "4.2.1"
@@ -741,9 +746,8 @@ name = "webapi"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "channels" },
+    { name = "channels", extra = ["daphne"] },
     { name = "channels-redis" },
-    { name = "daphne" },
     { name = "django" },
     { name = "django-cors-headers" },
     { name = "django-extensions" },
@@ -759,9 +763,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "channels", specifier = ">=4.2.2" },
+    { name = "channels", extras = ["daphne"], specifier = ">=4.2.2" },
     { name = "channels-redis", specifier = ">=4.2.1" },
-    { name = "daphne", specifier = ">=4.2.1" },
     { name = "django", specifier = ">=5.1.6" },
     { name = "django-cors-headers", specifier = ">=4.7.0" },
     { name = "django-extensions", specifier = ">=3.2.3" },
