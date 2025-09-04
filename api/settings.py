@@ -36,7 +36,7 @@ if DEV:
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 else:
     ALLOWED_HOSTS = ["web.xuyue.cc", "10.13.114.114"]
-    CSRF_TRUSTED_ORIGINS = ["https://web.xuyue.cc", "http://10.13.114.114"]
+    CSRF_TRUSTED_ORIGINS = ["https://web.xuyue.cc", "http://10.13.114.114:91"]
 
 # Application definition
 
