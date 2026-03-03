@@ -8,7 +8,7 @@ class TaskTypeChoices(models.TextChoices):
 
 
 class Task(TimeStampedModel):
-    display = models.IntegerField(unique=True, db_index=True, verbose_name="序号")
+    display = models.IntegerField(db_index=True, verbose_name="序号")
     title = models.CharField(max_length=100, verbose_name="标题")
     content = models.TextField(verbose_name="内容")
     task_type = models.CharField(
@@ -18,6 +18,9 @@ class Task(TimeStampedModel):
         verbose_name="类型",
     )
     is_public = models.BooleanField(default=False, verbose_name="是否公开")
+
+    class Meta:
+        unique_together = ("display", "task_type")
 
     def save(self, *args, **kwargs):
         if not self.task_type:
