@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 DEV = os.getenv("ENV") != "production"
 
@@ -55,7 +55,7 @@ INSTALLED_APPS = [
     "account",
     "task",
     "submission",
-    "chat",
+    "prompt",
 ]
 
 MIDDLEWARE = [
@@ -201,3 +201,8 @@ NINJA_PAGINATION_PER_PAGE = 10
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# LLM Configuration
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.deepseek.com")
+LLM_MODEL = os.environ.get("LLM_MODEL", "deepseek-chat")

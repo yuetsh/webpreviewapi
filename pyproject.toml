@@ -17,5 +17,6 @@ dependencies = [
     "django-redis>=6.0.0",
     "redis>=7.1.0",
     "channels[daphne]>=4.3.2",
-    "channels-redis>=4.3.0"
+    "channels-redis>=4.3.0",
+    "openai>=2.24.0",
 ]

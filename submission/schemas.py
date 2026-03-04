@@ -8,6 +8,7 @@ class SubmissionIn(Schema):
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
+    conversation_id: Optional[UUID] = None
 
 
 class SubmissionOut(Schema):
@@ -23,6 +24,7 @@ class SubmissionOut(Schema):
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
+    conversation_id: Optional[UUID] = None
     created: str
     modified: str
 
@@ -38,6 +40,7 @@ class SubmissionOut(Schema):
             "task_type": submission.task.task_type,
             "score": submission.score,
             "my_score": rating_dict.get(submission.id, 0),
+            "conversation_id": submission.conversation_id,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
@@ -57,6 +60,7 @@ class SubmissionOut(Schema):
             "html": submission.html,
             "css": submission.css,
             "js": submission.js,
+            "conversation_id": submission.conversation_id,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }

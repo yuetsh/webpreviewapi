@@ -29,13 +29,21 @@ def create_submission(request, payload: SubmissionIn):
     创建一个新的提交
     """
     task = get_object_or_404(Task, id=payload.task_id)
-
+    conversation = None
+    if payload.conversation_id:
+        from prompt.models import Conversation
+        conversation = get_object_or_404(
+            Conversation, id=payload.conversation_id, user=request.user
+        )
+        conversation.is_active = False
+        conversation.save(update_fields=["is_active"])
     Submission.objects.create(
         user=request.user,
         task=task,
         html=payload.html,
         css=payload.css,
         js=payload.js,
+        conversation=conversation,
     )
 
 

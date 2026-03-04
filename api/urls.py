@@ -28,6 +28,7 @@ api.add_router("tutorial/", "task.tutorial.router")
 api.add_router("challenge/", "task.challenge.router")
 api.add_router("submission/", "submission.api.router")
 api.add_router("upload/", "utils.upload.router")
+api.add_router("prompt/", "prompt.api.router")
 
 
 apis = [
