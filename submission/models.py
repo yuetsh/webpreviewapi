@@ -11,6 +11,13 @@ from task.models import Task
 from prompt.models import Conversation
 
 
+class FlagChoices(models.TextChoices):
+    RED = "red", "值得展示"
+    BLUE = "blue", "需要讲解"
+    GREEN = "green", "优秀作品"
+    YELLOW = "yellow", "需要改进"
+
+
 class Submission(TimeStampedModel):
     id = models.UUIDField(
         primary_key=True,
@@ -30,6 +37,14 @@ class Submission(TimeStampedModel):
     conversation = models.ForeignKey(
         Conversation, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="submissions", verbose_name="对话"
+    )
+    flag = models.CharField(
+        max_length=10,
+        choices=FlagChoices.choices,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name="标记",
     )
 
     class Meta:
