@@ -25,6 +25,7 @@ class SubmissionOut(Schema):
     css: Optional[str] = None
     js: Optional[str] = None
     conversation_id: Optional[UUID] = None
+    flag: Optional[str] = None
     created: str
     modified: str
 
@@ -41,6 +42,7 @@ class SubmissionOut(Schema):
             "score": submission.score,
             "my_score": rating_dict.get(submission.id, 0),
             "conversation_id": submission.conversation_id,
+            "flag": submission.flag,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
@@ -61,6 +63,7 @@ class SubmissionOut(Schema):
             "css": submission.css,
             "js": submission.js,
             "conversation_id": submission.conversation_id,
+            "flag": submission.flag,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
@@ -79,3 +82,8 @@ class SubmissionFilter(Schema):
     task_id: Optional[int] = None
     task_type: Optional[Literal["tutorial", "challenge"]] = None
     username: Optional[str] = None
+    flag: Optional[Literal["red", "blue", "green", "yellow"]] = None
+
+
+class FlagIn(Schema):
+    flag: Optional[Literal["red", "blue", "green", "yellow"]] = None
