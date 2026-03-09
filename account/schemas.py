@@ -46,3 +46,9 @@ class UserLoginSchema(Schema):
 class BatchUsersIn(Schema):
     names: List[str]
     classname: str
+
+
+class LeaderboardEntry(Schema):
+    rank: int
+    username: str
+    total_score: float

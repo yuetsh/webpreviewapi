@@ -6,6 +6,7 @@ from ninja.pagination import paginate
 from ninja.errors import HttpError
 from .schemas import (
     BatchUsersIn,
+    LeaderboardEntry,
     UserListSchema,
     UserRegistrationSchema,
     UserLoginSchema,
@@ -119,3 +120,18 @@ def toggle_user_is_active(request, id: int):
         }
     except User.DoesNotExist:
         raise HttpError(404, "查无此人")
+
+
+@router.get("/leaderboard", response=List[LeaderboardEntry])
+def leaderboard(request):
+    from .models import Profile
+    profiles = (
+        Profile.objects
+        .select_related("user")
+        .filter(total_score__gt=0)
+        .order_by("-total_score")
+    )
+    return [
+        LeaderboardEntry(rank=i + 1, username=p.user.username, total_score=p.total_score)
+        for i, p in enumerate(profiles)
+    ]

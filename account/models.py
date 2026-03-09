@@ -47,14 +47,23 @@ class User(AbstractUser):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    total_score = models.IntegerField(default=0)
+    total_score = models.FloatField(default=0.0)
 
     def __str__(self):
         return self.user.username
 
-    def update_total_score(self, score: int):
-        self.total_score = self.total_score + score
-        self.save()
+    def recalculate_total_score(self):
+        from django.db.models import Max, Sum
+        from submission.models import Submission
+        total = (
+            Submission.objects
+            .filter(user=self.user, task__task_type="challenge", score__gt=0)
+            .values("task_id")
+            .annotate(best=Max("score"))
+            .aggregate(total=Sum("best"))["total"]
+        ) or 0.0
+        self.total_score = total
+        self.save(update_fields=["total_score"])
 
 
 @receiver(post_save, sender=User)

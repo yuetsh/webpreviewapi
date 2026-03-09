@@ -40,6 +40,7 @@ class Tutorial(Task):
 
 class Challenge(Task):
     score = models.IntegerField(default=0)
+    pass_score = models.FloatField(null=True, blank=True, verbose_name="通过分数线")
 
     def __str__(self):
         return self.title

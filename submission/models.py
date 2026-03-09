@@ -136,3 +136,4 @@ def update_submission_score_on_save(sender, instance, **kwargs):
     当Rating保存时，更新对应的Submission的平均分
     """
     instance.submission.update_score()
+    instance.submission.user.profile.recalculate_total_score()
