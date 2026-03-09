@@ -87,14 +87,19 @@ def get_submission(request, submission_id: UUID):
     """
     获取单个提交的详细信息
     """
+    user_rating_subquery = Subquery(
+        Rating.objects.filter(user=request.user, submission=OuterRef("pk")).values(
+            "score"
+        )[:1],
+        output_field=IntegerField(),
+    )
     submission = get_object_or_404(
-        Submission.objects.select_related("task", "user"), id=submission_id
+        Submission.objects.select_related("task", "user").annotate(
+            my_score=user_rating_subquery
+        ),
+        id=submission_id,
     )
-    rating = (
-        Rating.objects.filter(user=request.user, submission=submission)
-        .first()
-    )
-    return SubmissionOut.get(submission, rating)
+    return submission
 
 
 @router.put("/{submission_id}/score")
