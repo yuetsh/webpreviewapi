@@ -44,6 +44,7 @@ class Submission(TimeStampedModel):
         null=True,
         blank=True,
         default=None,
+        db_index=True,
         verbose_name="标记",
     )
 
@@ -63,7 +64,7 @@ class Submission(TimeStampedModel):
         """
         更新当前Submission的分数
         """
-        ratings = self.ratings.all()
+        ratings = list(self.ratings.select_related("user").all())
 
         super_score = 0.0
         admin_score = 0.0
@@ -77,13 +78,13 @@ class Submission(TimeStampedModel):
             else:
                 normal_score += rating.score
 
-        if ratings.exists():
+        if ratings:
             total_score = super_score * 0.5 + admin_score * 0.3 + normal_score * 0.2
-            self.score = total_score / ratings.count()
+            self.score = total_score / len(ratings)
         else:
             self.score = 0.0
 
-        self.save()
+        self.save(update_fields=["score"])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -20,7 +20,7 @@ class SubmissionOut(Schema):
     task_title: str
     task_type: Literal["tutorial", "challenge"]
     score: float
-    my_score: int
+    my_score: int = 0
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
@@ -30,22 +30,40 @@ class SubmissionOut(Schema):
     modified: str
 
     @staticmethod
-    def list(submission, rating_dict):
-        return {
-            "id": submission.id,
-            "userid": submission.user.id,
-            "username": submission.user.username,
-            "task_id": submission.task.id,
-            "task_display": submission.task.display,
-            "task_title": submission.task.title,
-            "task_type": submission.task.task_type,
-            "score": submission.score,
-            "my_score": rating_dict.get(submission.id, 0),
-            "conversation_id": submission.conversation_id,
-            "flag": submission.flag,
-            "created": submission.created.isoformat(),
-            "modified": submission.modified.isoformat(),
-        }
+    def resolve_userid(obj):
+        return obj.user.id
+
+    @staticmethod
+    def resolve_username(obj):
+        return obj.user.username
+
+    @staticmethod
+    def resolve_task_id(obj):
+        return obj.task.id
+
+    @staticmethod
+    def resolve_task_display(obj):
+        return obj.task.display
+
+    @staticmethod
+    def resolve_task_title(obj):
+        return obj.task.title
+
+    @staticmethod
+    def resolve_task_type(obj):
+        return obj.task.task_type
+
+    @staticmethod
+    def resolve_my_score(obj):
+        return getattr(obj, "my_score", None) or 0
+
+    @staticmethod
+    def resolve_created(obj):
+        return obj.created.isoformat()
+
+    @staticmethod
+    def resolve_modified(obj):
+        return obj.modified.isoformat()
 
     @staticmethod
     def get(submission, rating):

@@ -56,7 +56,9 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     """
     获取提交列表，支持按任务和用户过滤
     """
-    submissions = Submission.objects.select_related("task", "user")
+    submissions = Submission.objects.select_related("task", "user").defer(
+        "html", "css", "js"
+    )
 
     if filters.task_id:
         task = get_object_or_404(Task, id=filters.task_id)
@@ -76,12 +78,7 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     )
     submissions = submissions.annotate(my_score=user_rating_subquery)
 
-    def get_submission_data(submission):
-        """从 submission 对象构建 SubmissionOut 数据"""
-        my_score = getattr(submission, "my_score", None) or 0
-        return SubmissionOut.list(submission, {submission.id: my_score})
-
-    return [get_submission_data(submission) for submission in submissions]
+    return submissions
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
@@ -90,10 +87,11 @@ def get_submission(request, submission_id: UUID):
     """
     获取单个提交的详细信息
     """
-    submission = get_object_or_404(Submission, id=submission_id)
+    submission = get_object_or_404(
+        Submission.objects.select_related("task", "user"), id=submission_id
+    )
     rating = (
-        Rating.objects.select_related("user", "submission")
-        .filter(user=request.user, submission=submission)
+        Rating.objects.filter(user=request.user, submission=submission)
         .first()
     )
     return SubmissionOut.get(submission, rating)
