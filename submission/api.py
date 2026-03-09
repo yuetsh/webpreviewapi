@@ -9,6 +9,7 @@ from django.db.models import OuterRef, Subquery, IntegerField
 
 
 from .schemas import (
+    FlagIn,
     SubmissionFilter,
     SubmissionIn,
     SubmissionOut,
@@ -18,6 +19,7 @@ from .schemas import (
 
 from .models import Rating, Submission
 from task.models import Task
+from account.models import RoleChoices
 
 router = Router()
 
@@ -63,6 +65,8 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
         submissions = submissions.filter(task__task_type=filters.task_type)
     if filters.username:
         submissions = submissions.filter(user__username__icontains=filters.username)
+    if filters.flag:
+        submissions = submissions.filter(flag=filters.flag)
 
     user_rating_subquery = Subquery(
         Rating.objects.filter(user=request.user, submission=OuterRef("pk")).values(
@@ -116,3 +120,18 @@ def update_score(request, submission_id: UUID, payload: RatingScoreIn):
         return {"message": "打分成功"}
     else:
         return {"message": "你已经给这个提交打过分了"}
+
+
+@router.put("/{submission_id}/flag")
+@login_required
+def update_flag(request, submission_id: UUID, payload: FlagIn):
+    """
+    设置或清除提交的标记（仅管理员和超级管理员可操作）
+    """
+    if request.user.role not in (RoleChoices.SUPER, RoleChoices.ADMIN):
+        raise HttpError(403, "没有权限")
+
+    submission = get_object_or_404(Submission, id=submission_id)
+    submission.flag = payload.flag
+    submission.save(update_fields=["flag"])
+    return {"flag": submission.flag}
