@@ -1,25 +1,31 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from ninja import Router, Query
 from ninja.errors import HttpError
 from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, OuterRef, Q, Subquery, IntegerField
+from django.db.models import Avg, Count, IntegerField, Max, OuterRef, Q, Subquery
 
 
 from .schemas import (
     FlagIn,
+    FlagStats,
+    SubmissionCountBucket,
     SubmissionFilter,
     SubmissionIn,
     SubmissionOut,
     RatingScoreIn,
+    ScoreBucket,
+    TaskStatsOut,
+    TopSubmission,
+    UserTag,
 )
 
 
 from .models import Rating, Submission
 from task.models import Task
-from account.models import RoleChoices
+from account.models import RoleChoices, User
 
 router = Router()
 
@@ -165,6 +171,190 @@ def delete_submission(request, submission_id: UUID):
         raise HttpError(403, "只能删除自己的提交")
     submission.delete()
     return {"message": "删除成功"}
+
+
+@router.get("/stats/{task_id}", response=TaskStatsOut)
+@login_required
+def get_task_stats(request, task_id: int, classname: Optional[str] = None):
+    """
+    获取某个挑战任务的班级提交统计数据（仅管理员）
+    """
+    if request.user.role not in (RoleChoices.SUPER, RoleChoices.ADMIN):
+        raise HttpError(403, "没有权限")
+
+    task = get_object_or_404(Task, id=task_id)
+
+    # All distinct classnames (unfiltered, for filter buttons in UI)
+    all_classes = list(
+        User.objects.filter(role=RoleChoices.NORMAL)
+        .exclude(classname="")
+        .values_list("classname", flat=True)
+        .distinct()
+        .order_by("classname")
+    )
+
+    # Student universe: Normal users, optionally filtered by classname
+    students = User.objects.filter(role=RoleChoices.NORMAL)
+    if classname:
+        students = students.filter(classname=classname)
+
+    student_ids = list(students.values_list("id", flat=True))
+    total_students = len(student_ids)
+
+    # Submitted student IDs
+    submitted_ids = set(
+        Submission.objects.filter(task=task, user_id__in=student_ids)
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+    submitted_count = len(submitted_ids)
+    unsubmitted_count = total_students - submitted_count
+
+    # Unsubmitted users
+    unsubmitted_users = [
+        UserTag(username=u.username, classname=u.classname)
+        for u in students.exclude(id__in=submitted_ids).order_by("classname", "username")
+    ]
+
+    # Latest submission per submitted user (SQLite-compatible).
+    # Find each user's max created timestamp, then resolve all matching IDs
+    # in a single query using OR'd Q objects instead of one query per user.
+    latest_per_user = list(
+        Submission.objects.filter(task=task, user_id__in=submitted_ids)
+        .values("user_id")
+        .annotate(max_created=Max("created"))
+    )
+    latest_sub_ids = []
+    if latest_per_user:
+        user_time_filter = Q()
+        for row in latest_per_user:
+            user_time_filter |= Q(user_id=row["user_id"], created=row["max_created"])
+        # Fetch all matching submissions in one query; deduplicate by user_id
+        seen_users: set = set()
+        for sub_id, uid in (
+            Submission.objects.filter(user_time_filter, task=task)
+            .values_list("id", "user_id")
+        ):
+            if uid not in seen_users:
+                seen_users.add(uid)
+                latest_sub_ids.append(sub_id)
+    latest_subs = list(Submission.objects.filter(id__in=latest_sub_ids))
+
+    # Average score from latest submissions (None if no submissions have score > 0)
+    avg_result = (
+        Submission.objects.filter(id__in=latest_sub_ids, score__gt=0)
+        .aggregate(avg=Avg("score"))["avg"]
+    )
+    average_score = round(avg_result, 2) if avg_result is not None else None
+
+    # Unrated: submitted but no Rating on any of their submissions for this task
+    rated_ids = set(
+        Rating.objects.filter(
+            submission__task=task, submission__user_id__in=submitted_ids
+        )
+        .values_list("submission__user_id", flat=True)
+        .distinct()
+    )
+    unrated_ids = submitted_ids - rated_ids
+    unrated_count = len(unrated_ids)
+    unrated_users = [
+        UserTag(username=u.username, classname=u.classname)
+        for u in students.filter(id__in=unrated_ids).order_by("classname", "username")
+    ]
+
+    # Nominated count: distinct users with nominated=True (task-wide, not class-filtered)
+    nominated_count = (
+        Submission.objects.filter(task=task, nominated=True)
+        .values("user_id")
+        .distinct()
+        .count()
+    )
+
+    # Submission count distribution
+    sub_counts = dict(
+        Submission.objects.filter(task=task, user_id__in=submitted_ids)
+        .values("user_id")
+        .annotate(c=Count("id"))
+        .values_list("user_id", "c")
+    )
+    dist = {"count_1": 0, "count_2": 0, "count_3": 0, "count_4_plus": 0}
+    for c in sub_counts.values():
+        if c == 1:
+            dist["count_1"] += 1
+        elif c == 2:
+            dist["count_2"] += 1
+        elif c == 3:
+            dist["count_3"] += 1
+        else:
+            dist["count_4_plus"] += 1
+
+    # Score distribution from latest submissions (exclude unrated score=0).
+    # Rating scale is 1-5 stars; one bucket per star level.
+    score_dist = {
+        "range_1_2": 0, "range_2_3": 0, "range_3_4": 0,
+        "range_4_5": 0, "range_5": 0,
+    }
+    for sub in latest_subs:
+        if sub.score == 0:
+            continue
+        s = sub.score
+        if s >= 5:
+            score_dist["range_5"] += 1
+        elif s >= 4:
+            score_dist["range_4_5"] += 1
+        elif s >= 3:
+            score_dist["range_3_4"] += 1
+        elif s >= 2:
+            score_dist["range_2_3"] += 1
+        else:
+            score_dist["range_1_2"] += 1
+
+    # Top 5 submissions by rating count
+    top_subs_qs = (
+        Submission.objects.filter(task=task, user_id__in=student_ids)
+        .select_related("user")
+        .annotate(rating_count=Count("ratings"))
+        .order_by("-rating_count")[:5]
+    )
+    top_submissions = [
+        TopSubmission(
+            submission_id=str(s.id),
+            username=s.user.username,
+            classname=s.user.classname,
+            score=s.score,
+            rating_count=s.rating_count,
+        )
+        for s in top_subs_qs
+    ]
+
+    # Flag stats (all submissions for this task, not grouped by user)
+    flag_counts = dict(
+        Submission.objects.filter(task=task, flag__isnull=False)
+        .values("flag")
+        .annotate(c=Count("id"))
+        .values_list("flag", "c")
+    )
+    flag_stats = FlagStats(
+        red=flag_counts.get("red", 0),
+        blue=flag_counts.get("blue", 0),
+        green=flag_counts.get("green", 0),
+        yellow=flag_counts.get("yellow", 0),
+    )
+
+    return TaskStatsOut(
+        submitted_count=submitted_count,
+        unsubmitted_count=unsubmitted_count,
+        average_score=average_score,
+        unrated_count=unrated_count,
+        nominated_count=nominated_count,
+        unsubmitted_users=unsubmitted_users,
+        unrated_users=unrated_users,
+        submission_count_distribution=SubmissionCountBucket(**dist),
+        score_distribution=ScoreBucket(**score_dist),
+        top_submissions=top_submissions,
+        flag_stats=flag_stats,
+        classes=all_classes,
+    )
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
