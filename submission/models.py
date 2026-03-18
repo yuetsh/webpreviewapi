@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver  # 导入receiver
 
-from account.models import Profile, RoleChoices, User
+from account.models import RoleChoices, User
 from task.models import Task
 from prompt.models import Conversation
 
@@ -93,8 +93,6 @@ class Submission(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # if self.score > 0:
-        #     self.user.profile.update_total_score(self.score)
 
 
 class Rating(models.Model):
@@ -141,4 +139,3 @@ def update_submission_score_on_save(sender, instance, **kwargs):
     当Rating保存时，更新对应的Submission的平均分
     """
     instance.submission.update_score()
-    instance.submission.user.profile.recalculate_total_score()

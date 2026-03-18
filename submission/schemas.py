@@ -121,9 +121,3 @@ class FlagIn(Schema):
     flag: Optional[Literal["red", "blue", "green", "yellow"]] = None
 
 
-class MyScoreOut(Schema):
-    task_id: int
-    task_display: int
-    task_title: str
-    score: float
-    created: str

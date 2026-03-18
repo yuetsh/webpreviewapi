@@ -1,9 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 
 class RoleChoices(models.TextChoices):
     SUPER = "super", "超级管理员"
@@ -51,33 +48,3 @@ class User(AbstractUser):
         verbose_name_plural = verbose_name
 
 
-class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    total_score = models.FloatField(default=0.0)
-
-    def __str__(self):
-        return self.user.username
-
-    def recalculate_total_score(self):
-        from django.db.models import Max, Sum
-        from submission.models import Submission
-        total = (
-            Submission.objects
-            .filter(user=self.user, task__task_type="challenge", score__gt=0)
-            .values("task_id")
-            .annotate(best=Max("score"))
-            .aggregate(total=Sum("best"))["total"]
-        ) or 0.0
-        self.total_score = total
-        self.save(update_fields=["total_score"])
-
-
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()

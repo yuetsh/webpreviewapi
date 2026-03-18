@@ -10,7 +10,6 @@ from django.db.models import Count, OuterRef, Q, Subquery, IntegerField
 
 from .schemas import (
     FlagIn,
-    MyScoreOut,
     SubmissionFilter,
     SubmissionIn,
     SubmissionOut,
@@ -121,27 +120,6 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     submissions = submissions.annotate(submit_count=submit_count_subquery)
 
     return submissions
-
-
-@router.get("/my-scores", response=List[MyScoreOut])
-@login_required
-def my_scores(request):
-    seen = {}
-    for s in Submission.objects.filter(
-        user=request.user, task__task_type="challenge"
-    ).order_by("-score").select_related("task"):
-        if s.task_id not in seen:
-            seen[s.task_id] = s
-    return [
-        MyScoreOut(
-            task_id=s.task_id,
-            task_display=s.task.display,
-            task_title=s.task.title,
-            score=s.score,
-            created=s.created.isoformat(),
-        )
-        for s in seen.values()
-    ]
 
 
 
