@@ -52,3 +52,8 @@ class LeaderboardEntry(Schema):
     rank: int
     username: str
     total_score: float
+
+
+class ClassStudentEntry(Schema):
+    name: str
+    username: str

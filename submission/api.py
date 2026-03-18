@@ -5,7 +5,7 @@ from ninja.errors import HttpError
 from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import OuterRef, Subquery, IntegerField
+from django.db.models import Count, OuterRef, Q, Subquery, IntegerField
 
 
 from .schemas import (
@@ -40,6 +40,11 @@ def create_submission(request, payload: SubmissionIn):
         )
         conversation.is_active = False
         conversation.save(update_fields=["is_active"])
+    # 如果用户之前已参与排名，自动转移提名到新提交
+    had_nomination = Submission.objects.filter(
+        user=request.user, task=task, nominated=True
+    ).update(nominated=False) > 0
+
     Submission.objects.create(
         user=request.user,
         task=task,
@@ -47,6 +52,7 @@ def create_submission(request, payload: SubmissionIn):
         css=payload.css,
         js=payload.js,
         conversation=conversation,
+        nominated=had_nomination,
     )
 
 
@@ -68,8 +74,34 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
         submissions = submissions.filter(task__task_type=filters.task_type)
     if filters.username:
         submissions = submissions.filter(user__username__icontains=filters.username)
+    if filters.user_id:
+        submissions = submissions.filter(user_id=filters.user_id)
     if filters.flag:
-        submissions = submissions.filter(flag=filters.flag)
+        if filters.flag == "any":
+            submissions = submissions.filter(flag__isnull=False)
+        else:
+            submissions = submissions.filter(flag=filters.flag)
+
+    if filters.nominated is not None:
+        submissions = submissions.filter(nominated=filters.nominated)
+    if filters.score_lt_threshold is not None:
+        submissions = submissions.filter(score__lt=filters.score_lt_threshold)
+    else:
+        if filters.score_min is not None:
+            submissions = submissions.filter(score__gte=filters.score_min)
+        if filters.score_max_exclusive is not None:
+            submissions = submissions.filter(score__lt=filters.score_max_exclusive)
+    if filters.ordering in ("-score", "score", "-created"):
+        submissions = submissions.order_by(filters.ordering)
+
+    if filters.grouped:
+        # 分组模式：每个 (user, task) 只保留最新一条
+        latest_per_group = (
+            Submission.objects.filter(user=OuterRef("user"), task=OuterRef("task"))
+            .order_by("-created")
+            .values("pk")[:1]
+        )
+        submissions = submissions.filter(pk=Subquery(latest_per_group))
 
     user_rating_subquery = Subquery(
         Rating.objects.filter(user=request.user, submission=OuterRef("pk")).values(
@@ -78,6 +110,15 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
         output_field=IntegerField(),
     )
     submissions = submissions.annotate(my_score=user_rating_subquery)
+
+    # 同一用户同一任务的提交次数
+    submit_count_subquery = Subquery(
+        Submission.objects.filter(
+            user=OuterRef("user"), task=OuterRef("task")
+        ).values("user", "task").annotate(c=Count("id")).values("c")[:1],
+        output_field=IntegerField(),
+    )
+    submissions = submissions.annotate(submit_count=submit_count_subquery)
 
     return submissions
 
@@ -102,6 +143,50 @@ def my_scores(request):
         for s in seen.values()
     ]
 
+
+
+@router.get("/by-user-task", response=List[SubmissionOut])
+@login_required
+def list_by_user_task(request, user_id: int, task_id: int):
+    """
+    获取某用户某任务的所有提交（不分页）
+    """
+    user_rating_subquery = Subquery(
+        Rating.objects.filter(user=request.user, submission=OuterRef("pk")).values(
+            "score"
+        )[:1],
+        output_field=IntegerField(),
+    )
+    return (
+        Submission.objects.filter(user_id=user_id, task_id=task_id)
+        .select_related("task", "user")
+        .defer("html", "css", "js")
+        .annotate(my_score=user_rating_subquery)
+        .order_by("-created")
+    )
+
+
+@router.delete("/flags")
+@login_required
+def clear_all_flags(request):
+    """
+    清除所有提交的标记（仅管理员和超级管理员可操作）
+    """
+    if request.user.role not in (RoleChoices.SUPER, RoleChoices.ADMIN):
+        raise HttpError(403, "没有权限")
+
+    count = Submission.objects.filter(flag__isnull=False).update(flag=None)
+    return {"cleared": count}
+
+
+@router.delete("/{submission_id}")
+@login_required
+def delete_submission(request, submission_id: UUID):
+    submission = get_object_or_404(Submission, id=submission_id)
+    if submission.user != request.user:
+        raise HttpError(403, "只能删除自己的提交")
+    submission.delete()
+    return {"message": "删除成功"}
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
@@ -161,3 +246,27 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     submission.flag = payload.flag
     submission.save(update_fields=["flag"])
     return {"flag": submission.flag}
+
+
+@router.put("/{submission_id}/nominate")
+@login_required
+def nominate_submission(request, submission_id: UUID):
+    """
+    学生将某条提交标记为"参与排名"。
+    同一用户同一题目只能有一条参与排名，旧的自动取消。
+    """
+    submission = get_object_or_404(Submission, id=submission_id)
+
+    if submission.user != request.user:
+        raise HttpError(403, "只能提名自己的提交")
+
+    Submission.objects.filter(
+        user=request.user,
+        task=submission.task,
+        nominated=True,
+    ).exclude(pk=submission.pk).update(nominated=False)
+
+    submission.nominated = True
+    submission.save(update_fields=["nominated"])
+
+    return {"nominated": True}

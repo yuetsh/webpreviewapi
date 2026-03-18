@@ -6,6 +6,7 @@ from ninja.pagination import paginate
 from ninja.errors import HttpError
 from .schemas import (
     BatchUsersIn,
+    ClassStudentEntry,
     LeaderboardEntry,
     UserListSchema,
     UserRegistrationSchema,
@@ -96,7 +97,7 @@ def batch_create(request, payload: BatchUsersIn):
     # 批量创建用户
     for username in usernames:
         password = generate_password()
-        user = User(username=username)
+        user = User(username=username, classname=payload.classname)
         user.set_password(password)
         users_to_create.append(user)
 
@@ -134,4 +135,29 @@ def leaderboard(request):
     return [
         LeaderboardEntry(rank=i + 1, username=p.user.username, total_score=p.total_score)
         for i, p in enumerate(profiles)
+    ]
+
+
+@router.get("/classes", response=List[str])
+def list_classes(request):
+    """返回所有不重复的非空班级名列表，按字典序升序"""
+    return (
+        User.objects.filter(classname__gt="")
+        .values_list("classname", flat=True)
+        .distinct()
+        .order_by("classname")
+    )
+
+
+@router.get("/names", response=List[ClassStudentEntry])
+def list_names_by_class(request, classname: str):
+    """返回指定班级的学生姓名和用户名列表"""
+    prefix = "web" + classname
+    users = User.objects.filter(
+        classname=classname,
+        username__startswith=prefix,
+    ).order_by("username")
+    return [
+        ClassStudentEntry(name=u.username[len(prefix):], username=u.username)
+        for u in users
     ]

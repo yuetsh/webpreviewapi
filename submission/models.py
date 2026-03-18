@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.db.models import Avg
 from django_extensions.db.models import TimeStampedModel
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -47,6 +48,8 @@ class Submission(TimeStampedModel):
         db_index=True,
         verbose_name="标记",
     )
+    raw_score = models.FloatField(default=0.0, verbose_name="原始加权分")
+    nominated = models.BooleanField(default=False, db_index=True, verbose_name="参与排名")
 
     class Meta:
         ordering = ("-created",)
@@ -61,30 +64,32 @@ class Submission(TimeStampedModel):
         return self.task.task_type
 
     def update_score(self):
-        """
-        更新当前Submission的分数
-        """
         ratings = list(self.ratings.select_related("user").all())
+        n = len(ratings)
 
-        super_score = 0.0
-        admin_score = 0.0
-        normal_score = 0.0
-
-        for rating in ratings:
-            if rating.user.role == RoleChoices.SUPER:
-                super_score += rating.score
-            elif rating.user.role == RoleChoices.ADMIN:
-                admin_score += rating.score
-            else:
-                normal_score += rating.score
-
-        if ratings:
-            total_score = super_score * 0.5 + admin_score * 0.3 + normal_score * 0.2
-            self.score = total_score / len(ratings)
-        else:
+        if n == 0:
+            self.raw_score = 0.0
             self.score = 0.0
+            self.save(update_fields=["raw_score", "score"])
+            return
 
-        self.save(update_fields=["score"])
+        weighted_sum = sum(
+            r.score * (0.5 if r.user.role == RoleChoices.SUPER
+                       else 0.3 if r.user.role == RoleChoices.ADMIN
+                       else 0.2)
+            for r in ratings
+        )
+        self.raw_score = weighted_sum / n
+
+        C = 3
+        global_mean = (
+            Submission.objects.filter(raw_score__gt=0)
+            .exclude(pk=self.pk)
+            .aggregate(Avg("raw_score"))["raw_score__avg"]
+        ) or self.raw_score
+
+        self.score = (C * global_mean + n * self.raw_score) / (C + n)
+        self.save(update_fields=["raw_score", "score"])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

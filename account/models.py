@@ -27,6 +27,12 @@ class User(AbstractUser):
         blank=True,
         verbose_name="明文密码",
     )
+    classname = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="班级",
+    )
 
     def save(self, *args, **kwargs):
         if self.username:

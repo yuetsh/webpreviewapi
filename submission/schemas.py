@@ -26,6 +26,8 @@ class SubmissionOut(Schema):
     js: Optional[str] = None
     conversation_id: Optional[UUID] = None
     flag: Optional[str] = None
+    nominated: bool = False
+    submit_count: int = 0
     created: str
     modified: str
 
@@ -58,6 +60,10 @@ class SubmissionOut(Schema):
         return getattr(obj, "my_score", None) or 0
 
     @staticmethod
+    def resolve_submit_count(obj):
+        return getattr(obj, "submit_count", None) or 0
+
+    @staticmethod
     def resolve_created(obj):
         return obj.created.isoformat()
 
@@ -82,6 +88,7 @@ class SubmissionOut(Schema):
             "js": submission.js,
             "conversation_id": submission.conversation_id,
             "flag": submission.flag,
+            "nominated": submission.nominated,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
@@ -100,7 +107,14 @@ class SubmissionFilter(Schema):
     task_id: Optional[int] = None
     task_type: Optional[Literal["tutorial", "challenge"]] = None
     username: Optional[str] = None
-    flag: Optional[Literal["red", "blue", "green", "yellow"]] = None
+    user_id: Optional[int] = None
+    flag: Optional[Literal["red", "blue", "green", "yellow", "any"]] = None
+    score_min: Optional[float] = None
+    score_max_exclusive: Optional[float] = None
+    score_lt_threshold: Optional[float] = None
+    nominated: Optional[bool] = None
+    ordering: Optional[str] = None
+    grouped: Optional[bool] = True
 
 
 class FlagIn(Schema):
