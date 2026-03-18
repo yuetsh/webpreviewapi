@@ -16,7 +16,6 @@ from .schemas import (
     SubmissionIn,
     SubmissionOut,
     RatingScoreIn,
-    ScoreBucket,
     TaskStatsOut,
     TopSubmission,
     UserTag,
@@ -288,27 +287,6 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         else:
             dist["count_4_plus"] += 1
 
-    # Score distribution from latest submissions (exclude unrated score=0).
-    # Rating scale is 1-5 stars; one bucket per star level.
-    score_dist = {
-        "range_1_2": 0, "range_2_3": 0, "range_3_4": 0,
-        "range_4_5": 0, "range_5": 0,
-    }
-    for sub in latest_subs:
-        if sub.score == 0:
-            continue
-        s = sub.score
-        if s >= 5:
-            score_dist["range_5"] += 1
-        elif s >= 4:
-            score_dist["range_4_5"] += 1
-        elif s >= 3:
-            score_dist["range_3_4"] += 1
-        elif s >= 2:
-            score_dist["range_2_3"] += 1
-        else:
-            score_dist["range_1_2"] += 1
-
     # Top 5 submissions by rating count
     top_subs_qs = (
         Submission.objects.filter(task=task, user_id__in=student_ids)
@@ -350,7 +328,6 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         unsubmitted_users=unsubmitted_users,
         unrated_users=unrated_users,
         submission_count_distribution=SubmissionCountBucket(**dist),
-        score_distribution=ScoreBucket(**score_dist),
         top_submissions=top_submissions,
         flag_stats=flag_stats,
         classes=all_classes,

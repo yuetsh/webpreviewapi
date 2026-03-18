@@ -141,14 +141,6 @@ class SubmissionCountBucket(Schema):
     count_4_plus: int  # users with 4+ submissions
 
 
-class ScoreBucket(Schema):
-    range_1_2: int    # [1, 2)  ★
-    range_2_3: int    # [2, 3)  ★★
-    range_3_4: int    # [3, 4)  ★★★
-    range_4_5: int    # [4, 5)  ★★★★
-    range_5:   int    # [5, 5]  ★★★★★
-
-
 class FlagStats(Schema):
     red: int
     blue: int
@@ -165,7 +157,6 @@ class TaskStatsOut(Schema):
     unsubmitted_users: list[UserTag]
     unrated_users: list[UserTag]
     submission_count_distribution: SubmissionCountBucket
-    score_distribution: ScoreBucket
     top_submissions: list[TopSubmission]
     flag_stats: FlagStats
     classes: list[str]
