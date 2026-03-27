@@ -3,11 +3,6 @@ from django.conf import settings
 from openai import AsyncOpenAI
 
 
-client = AsyncOpenAI(
-    api_key=settings.LLM_API_KEY,
-    base_url=settings.LLM_BASE_URL,
-)
-
 SYSTEM_PROMPT = """你是一个网页生成助手。根据用户的需求描述，生成 HTML、CSS 和 JavaScript 代码。
 
 规则：
@@ -30,15 +25,20 @@ def build_messages(task_content: str, history: list[dict]) -> list[dict]:
 async def stream_chat(task_content: str, history: list[dict]):
     """Stream chat completion from the LLM. Yields content chunks."""
     messages = build_messages(task_content, history)
-    stream = await client.chat.completions.create(
-        model=settings.LLM_MODEL,
-        messages=messages,
-        stream=True,
-    )
-    async for chunk in stream:
-        delta = chunk.choices[0].delta
-        if delta.content:
-            yield delta.content
+    async with AsyncOpenAI(
+        api_key=settings.LLM_API_KEY,
+        base_url=settings.LLM_BASE_URL,
+        timeout=120.0,
+    ) as client:
+        stream = await client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=messages,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield delta.content
 
 
 def extract_code(text: str) -> dict:
