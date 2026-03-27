@@ -53,12 +53,11 @@ class PromptConsumer(AsyncWebsocketConsumer):
         try:
             # Build history for LLM
             history = await self.get_history_for_llm()
-            task_content = await self.get_task_content()
 
             # Stream AI response
             full_response = ""
             try:
-                async for chunk in stream_chat(task_content, history):
+                async for chunk in stream_chat(history):
                     full_response += chunk
                     await self.send(text_data=json.dumps({
                         "type": "stream",
@@ -139,9 +138,3 @@ class PromptConsumer(AsyncWebsocketConsumer):
     def get_history_for_llm(self):
         messages = self.conversation.messages.all()
         return [{"role": m.role, "content": m.content} for m in messages]
-
-    @database_sync_to_async
-    def get_task_content(self):
-        from task.models import Task
-        task = Task.objects.get(id=self.task_id)
-        return task.content
