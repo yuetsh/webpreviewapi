@@ -26,7 +26,6 @@ class SubmissionOut(Schema):
     js: Optional[str] = None
     conversation_id: Optional[UUID] = None
     flag: Optional[str] = None
-    nominated: bool = False
     submit_count: int = 0
     created: str
     modified: str
@@ -88,7 +87,6 @@ class SubmissionOut(Schema):
             "js": submission.js,
             "conversation_id": submission.conversation_id,
             "flag": submission.flag,
-            "nominated": submission.nominated,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),
         }
@@ -112,7 +110,6 @@ class SubmissionFilter(Schema):
     score_min: Optional[float] = None
     score_max_exclusive: Optional[float] = None
     score_lt_threshold: Optional[float] = None
-    nominated: Optional[bool] = None
     ordering: Optional[str] = None
     grouped: Optional[bool] = True
 
@@ -124,14 +121,6 @@ class FlagIn(Schema):
 class UserTag(Schema):
     username: str
     classname: str
-
-
-class TopSubmission(Schema):
-    submission_id: str  # UUID as string
-    username: str
-    classname: str
-    score: float
-    rating_count: int
 
 
 class SubmissionCountBucket(Schema):
@@ -153,11 +142,9 @@ class TaskStatsOut(Schema):
     unsubmitted_count: int
     average_score: Optional[float]
     unrated_count: int
-    nominated_count: int
     unsubmitted_users: list[UserTag]
     unrated_users: list[UserTag]
     submission_count_distribution: SubmissionCountBucket
-    top_submissions: list[TopSubmission]
     flag_stats: FlagStats
     classes: list[str]
 

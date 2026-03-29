@@ -17,7 +17,6 @@ from .schemas import (
     SubmissionOut,
     RatingScoreIn,
     TaskStatsOut,
-    TopSubmission,
     UserTag,
 )
 
@@ -44,10 +43,6 @@ def create_submission(request, payload: SubmissionIn):
         )
         conversation.is_active = False
         conversation.save(update_fields=["is_active"])
-    # 如果用户之前已参与排名，自动转移提名到新提交
-    had_nomination = Submission.objects.filter(
-        user=request.user, task=task, nominated=True
-    ).update(nominated=False) > 0
 
     Submission.objects.create(
         user=request.user,
@@ -56,7 +51,6 @@ def create_submission(request, payload: SubmissionIn):
         css=payload.css,
         js=payload.js,
         conversation=conversation,
-        nominated=had_nomination,
     )
 
 
@@ -67,8 +61,10 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     """
     获取提交列表，支持按任务和用户过滤
     """
-    submissions = Submission.objects.select_related("task", "user").defer(
-        "html", "css", "js"
+    submissions = (
+        Submission.objects.select_related("task", "user")
+        .defer("html", "css", "js")
+        .exclude(conversation__isnull=False, html__isnull=True, css__isnull=True, js__isnull=True)
     )
 
     if filters.task_id:
@@ -86,8 +82,6 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
         else:
             submissions = submissions.filter(flag=filters.flag)
 
-    if filters.nominated is not None:
-        submissions = submissions.filter(nominated=filters.nominated)
     if filters.score_lt_threshold is not None:
         submissions = submissions.filter(score__lt=filters.score_lt_threshold)
     else:
@@ -142,6 +136,7 @@ def list_by_user_task(request, user_id: int, task_id: int):
     )
     return (
         Submission.objects.filter(user_id=user_id, task_id=task_id)
+        .exclude(conversation__isnull=False, html__isnull=True, css__isnull=True, js__isnull=True)
         .select_related("task", "user")
         .defer("html", "css", "js")
         .annotate(my_score=user_rating_subquery)
@@ -261,14 +256,6 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         for u in students.filter(id__in=unrated_ids).order_by("classname", "username")
     ]
 
-    # Nominated count: distinct users with nominated=True (task-wide, not class-filtered)
-    nominated_count = (
-        Submission.objects.filter(task=task, nominated=True)
-        .values("user_id")
-        .distinct()
-        .count()
-    )
-
     # Submission count distribution
     sub_counts = dict(
         Submission.objects.filter(task=task, user_id__in=submitted_ids)
@@ -286,24 +273,6 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
             dist["count_3"] += 1
         else:
             dist["count_4_plus"] += 1
-
-    # Top 5 submissions by rating count
-    top_subs_qs = (
-        Submission.objects.filter(task=task, user_id__in=student_ids)
-        .select_related("user")
-        .annotate(rating_count=Count("ratings"))
-        .order_by("-rating_count")[:5]
-    )
-    top_submissions = [
-        TopSubmission(
-            submission_id=str(s.id),
-            username=s.user.username,
-            classname=s.user.classname,
-            score=s.score,
-            rating_count=s.rating_count,
-        )
-        for s in top_subs_qs
-    ]
 
     # Flag stats (all submissions for this task, not grouped by user)
     flag_counts = dict(
@@ -324,11 +293,9 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         unsubmitted_count=unsubmitted_count,
         average_score=average_score,
         unrated_count=unrated_count,
-        nominated_count=nominated_count,
         unsubmitted_users=unsubmitted_users,
         unrated_users=unrated_users,
         submission_count_distribution=SubmissionCountBucket(**dist),
-        top_submissions=top_submissions,
         flag_stats=flag_stats,
         classes=all_classes,
     )
@@ -393,25 +360,3 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     return {"flag": submission.flag}
 
 
-@router.put("/{submission_id}/nominate")
-@login_required
-def nominate_submission(request, submission_id: UUID):
-    """
-    学生将某条提交标记为"参与排名"。
-    同一用户同一题目只能有一条参与排名，旧的自动取消。
-    """
-    submission = get_object_or_404(Submission, id=submission_id)
-
-    if submission.user != request.user:
-        raise HttpError(403, "只能提名自己的提交")
-
-    Submission.objects.filter(
-        user=request.user,
-        task=submission.task,
-        nominated=True,
-    ).exclude(pk=submission.pk).update(nominated=False)
-
-    submission.nominated = True
-    submission.save(update_fields=["nominated"])
-
-    return {"nominated": True}

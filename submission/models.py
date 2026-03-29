@@ -49,7 +49,6 @@ class Submission(TimeStampedModel):
         verbose_name="标记",
     )
     raw_score = models.FloatField(default=0.0, verbose_name="原始加权分")
-    nominated = models.BooleanField(default=False, db_index=True, verbose_name="参与排名")
 
     class Meta:
         ordering = ("-created",)
