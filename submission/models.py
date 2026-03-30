@@ -19,6 +19,12 @@ class FlagChoices(models.TextChoices):
     YELLOW = "yellow", "需要改进"
 
 
+class ZoneChoices(models.TextChoices):
+    FEATURED = "featured", "精选"
+    LOW = "low", "待改进"
+    PENDING = "pending", "待评"
+
+
 class Submission(TimeStampedModel):
     id = models.UUIDField(
         primary_key=True,
@@ -49,6 +55,15 @@ class Submission(TimeStampedModel):
         verbose_name="标记",
     )
     raw_score = models.FloatField(default=0.0, verbose_name="原始加权分")
+    zone = models.CharField(
+        max_length=10,
+        choices=ZoneChoices.choices,
+        null=True,
+        blank=True,
+        default=None,
+        db_index=True,
+        verbose_name="分区",
+    )
 
     class Meta:
         ordering = ("-created",)
@@ -62,6 +77,19 @@ class Submission(TimeStampedModel):
         """
         return self.task.task_type
 
+    def _update_zone(self, n: int):
+        if n < 5:
+            new_zone = ZoneChoices.PENDING
+        elif self.score >= 4.0:
+            new_zone = ZoneChoices.FEATURED
+        elif self.score < 3.0:
+            new_zone = ZoneChoices.LOW
+        else:
+            new_zone = None
+        if self.zone != new_zone:
+            self.zone = new_zone
+            self.save(update_fields=["zone"])
+
     def update_score(self):
         ratings = list(self.ratings.select_related("user").all())
         n = len(ratings)
@@ -70,15 +98,18 @@ class Submission(TimeStampedModel):
             self.raw_score = 0.0
             self.score = 0.0
             self.save(update_fields=["raw_score", "score"])
+            self._update_zone(n)
             return
 
-        weighted_sum = sum(
-            r.score * (0.5 if r.user.role == RoleChoices.SUPER
-                       else 0.3 if r.user.role == RoleChoices.ADMIN
-                       else 0.2)
+        role_weights = [
+            0.5 if r.user.role == RoleChoices.SUPER
+            else 0.3 if r.user.role == RoleChoices.ADMIN
+            else 0.2
             for r in ratings
-        )
-        self.raw_score = weighted_sum / n
+        ]
+        weighted_sum = sum(r.score * w for r, w in zip(ratings, role_weights))
+        weight_total = sum(role_weights)
+        self.raw_score = weighted_sum / weight_total
 
         C = 3
         global_mean = (
@@ -89,6 +120,7 @@ class Submission(TimeStampedModel):
 
         self.score = (C * global_mean + n * self.raw_score) / (C + n)
         self.save(update_fields=["raw_score", "score"])
+        self._update_zone(n)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

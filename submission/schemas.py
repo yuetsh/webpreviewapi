@@ -26,6 +26,7 @@ class SubmissionOut(Schema):
     js: Optional[str] = None
     conversation_id: Optional[UUID] = None
     flag: Optional[str] = None
+    zone: Optional[str] = None
     submit_count: int = 0
     created: str
     modified: str
@@ -107,6 +108,7 @@ class SubmissionFilter(Schema):
     username: Optional[str] = None
     user_id: Optional[int] = None
     flag: Optional[Literal["red", "blue", "green", "yellow", "any"]] = None
+    zone: Optional[Literal["featured", "low", "pending"]] = None
     score_min: Optional[float] = None
     score_max_exclusive: Optional[float] = None
     score_lt_threshold: Optional[float] = None

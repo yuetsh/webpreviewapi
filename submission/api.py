@@ -86,6 +86,8 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
             submissions = submissions.filter(flag__isnull=False)
         else:
             submissions = submissions.filter(flag=filters.flag)
+    if filters.zone:
+        submissions = submissions.filter(zone=filters.zone)
 
     if filters.score_lt_threshold is not None:
         submissions = submissions.filter(score__lt=filters.score_lt_threshold)
