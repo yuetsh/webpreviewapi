@@ -28,6 +28,7 @@ class SubmissionOut(Schema):
     flag: Optional[str] = None
     zone: Optional[str] = None
     submit_count: int = 0
+    view_count: int = 0
     created: str
     modified: str
 
