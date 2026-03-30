@@ -10,6 +10,7 @@ class MessageOut(Schema):
     code_html: Optional[str] = None
     code_css: Optional[str] = None
     code_js: Optional[str] = None
+    prompt_level: Optional[int] = None
     created: str
 
 

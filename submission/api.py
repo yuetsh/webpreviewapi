@@ -1,3 +1,4 @@
+import threading
 from typing import List, Optional
 from uuid import UUID
 from ninja import Router, Query
@@ -44,7 +45,7 @@ def create_submission(request, payload: SubmissionIn):
         conversation.is_active = False
         conversation.save(update_fields=["is_active"])
 
-    Submission.objects.create(
+    sub = Submission.objects.create(
         user=request.user,
         task=task,
         html=payload.html,
@@ -52,6 +53,10 @@ def create_submission(request, payload: SubmissionIn):
         js=payload.js,
         conversation=conversation,
     )
+
+    if conversation:
+        from .classifier import classify_conversation_messages
+        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
 
 
 @router.get("/", response=List[SubmissionOut])
@@ -358,5 +363,7 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     submission.flag = payload.flag
     submission.save(update_fields=["flag"])
     return {"flag": submission.flag}
+
+
 
 

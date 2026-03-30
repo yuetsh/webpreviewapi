@@ -1,11 +1,14 @@
-from typing import List
+import threading
+from typing import List, Optional
 from uuid import UUID
 from ninja import Router
+from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 
 from .models import Conversation, Message
 from .schemas import ConversationOut, MessageOut
+from account.models import RoleChoices
 
 router = Router()
 
@@ -40,7 +43,53 @@ def list_messages(request, conversation_id: UUID):
             "code_html": m.code_html,
             "code_css": m.code_css,
             "code_js": m.code_js,
+            "prompt_level": m.prompt_level,
             "created": m.created.isoformat(),
         }
         for m in messages
     ]
+
+
+@router.post("/conversations/{conversation_id}/classify")
+@login_required
+def classify_conversation(request, conversation_id: UUID, force: bool = False):
+    """
+    对对话中所有用户消息进行层级分类（仅管理员和超级管理员可操作，异步执行）
+    """
+    if request.user.role not in (RoleChoices.SUPER, RoleChoices.ADMIN):
+        raise HttpError(403, "没有权限")
+
+    get_object_or_404(Conversation, id=conversation_id)
+
+    from submission.classifier import classify_conversation_messages
+    threading.Thread(
+        target=classify_conversation_messages,
+        args=(conversation_id,),
+        kwargs={"force": force},
+        daemon=True,
+    ).start()
+
+    return {"message": "开始分类"}
+
+
+@router.post("/classify-batch")
+@login_required
+def classify_batch(request, task_id: Optional[int] = None, force: bool = False):
+    """
+    批量分类所有（或指定任务）对话的用户消息层级（仅管理员和超级管理员，异步执行）
+    """
+    if request.user.role not in (RoleChoices.SUPER, RoleChoices.ADMIN):
+        raise HttpError(403, "没有权限")
+
+    qs = Message.objects.filter(role="user")
+    if task_id:
+        qs = qs.filter(conversation__task_id=task_id)
+    if not force:
+        qs = qs.filter(prompt_level__isnull=True)
+
+    ids = list(qs.values_list("id", flat=True))
+
+    from submission.classifier import classify_messages_batch
+    threading.Thread(target=classify_messages_batch, args=(ids,), daemon=True).start()
+
+    return {"message": f"开始分类 {len(ids)} 条消息", "count": len(ids)}

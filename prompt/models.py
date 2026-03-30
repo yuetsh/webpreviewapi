@@ -28,6 +28,9 @@ class Message(models.Model):
     code_css = models.TextField(null=True, blank=True)
     code_js = models.TextField(null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
+    prompt_level = models.IntegerField(
+        null=True, blank=True, default=None, db_index=True, verbose_name="提示词层级"
+    )
 
     class Meta:
         ordering = ("created",)
