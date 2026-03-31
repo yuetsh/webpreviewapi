@@ -1,7 +1,7 @@
 from typing import List
 from ninja import Router
 from django.shortcuts import get_object_or_404
-from account.decorators import super_required
+from account.decorators import admin_required, super_required
 from .schemas import ChallengeAll, ChallengeIn, ChallengeSlim
 from .models import Challenge
 
@@ -9,7 +9,7 @@ router = Router()
 
 
 @router.get("/list", response=List[ChallengeSlim])
-@super_required
+@admin_required
 def challenge(request):
     """
     后台显示所有的列表
@@ -31,7 +31,7 @@ def get(request, display: int):
 
 
 @router.post("/")
-@super_required
+@admin_required
 def create_or_update(request, payload: ChallengeIn):
     try:
         item = Challenge.objects.get(display=payload.display)
@@ -57,7 +57,7 @@ def toggle_public(request, display: int):
 
 
 @router.delete("/{display}")
-@super_required
+@admin_required
 def remove(request, display: int):
     Challenge.objects.filter(display=display).delete()
     return {"message": "删除成功"}
