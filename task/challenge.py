@@ -2,7 +2,8 @@ from typing import List
 from ninja import Router
 from django.shortcuts import get_object_or_404
 from account.decorators import admin_required, super_required
-from .schemas import ChallengeAll, ChallengeIn, ChallengeSlim
+from submission.models import Submission
+from .schemas import ChallengeAll, ChallengeDisplay, ChallengeIn, ChallengeSlim
 from .models import Challenge
 
 router = Router()
@@ -17,12 +18,33 @@ def challenge(request):
     return Challenge.objects.all()
 
 
-@router.get("/display", response=List[ChallengeSlim])
+@router.get("/display", response=List[ChallengeDisplay])
 def get_all_public_display(request):
     """
     前台显示所有公开的挑战
     """
-    return Challenge.objects.filter(is_public=True).order_by("-display")
+    challenges = list(Challenge.objects.filter(is_public=True).order_by("-display"))
+    if request.user.is_authenticated:
+        task_ids = [c.task_ptr_id for c in challenges]
+        submitted_ids = set(
+            Submission.objects.filter(
+                user=request.user,
+                task_id__in=task_ids,
+            ).values_list("task_id", flat=True)
+        )
+    else:
+        submitted_ids = set()
+    return [
+        ChallengeDisplay(
+            display=c.display,
+            title=c.title,
+            score=c.score,
+            pass_score=c.pass_score,
+            is_public=c.is_public,
+            submitted=c.task_ptr_id in submitted_ids,
+        )
+        for c in challenges
+    ]
 
 
 @router.get("/{display}", response=ChallengeAll)

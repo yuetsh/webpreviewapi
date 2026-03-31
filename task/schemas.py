@@ -1,3 +1,4 @@
+from typing import Optional
 from ninja import Schema, ModelSchema
 from .models import Tutorial, Challenge
 
@@ -25,7 +26,12 @@ class ChallengeSlim(Schema):
     display: int
     title: str
     score: int
+    pass_score: Optional[float] = None
     is_public: bool
+
+
+class ChallengeDisplay(ChallengeSlim):
+    submitted: bool
 
 
 class ChallengeAll(ModelSchema):
