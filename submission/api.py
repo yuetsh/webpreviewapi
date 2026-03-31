@@ -6,7 +6,7 @@ from ninja.errors import HttpError
 from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, IntegerField, Max, OuterRef, Q, Subquery
+from django.db.models import Avg, Count, F, IntegerField, Max, OuterRef, Q, Subquery
 
 
 from .schemas import (
@@ -326,6 +326,10 @@ def get_submission(request, submission_id: UUID):
         ),
         id=submission_id,
     )
+    Submission.objects.filter(pk=submission.pk).update(
+        view_count=F("view_count") + 1
+    )
+    submission.view_count += 1  # 更新内存中的值，避免再次查询
     return submission
 
 

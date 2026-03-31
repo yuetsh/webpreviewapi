@@ -64,6 +64,7 @@ class Submission(TimeStampedModel):
         db_index=True,
         verbose_name="分区",
     )
+    view_count = models.PositiveIntegerField(default=0, verbose_name="查看次数")
 
     class Meta:
         ordering = ("-created",)
