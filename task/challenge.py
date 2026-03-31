@@ -22,7 +22,7 @@ def get_all_public_display(request):
     """
     前台显示所有公开的挑战
     """
-    return Challenge.objects.filter(is_public=True)
+    return Challenge.objects.filter(is_public=True).order_by("-display")
 
 
 @router.get("/{display}", response=ChallengeAll)
