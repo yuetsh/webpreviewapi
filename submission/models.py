@@ -9,7 +9,6 @@ from django.dispatch import receiver  # 导入receiver
 
 from account.models import RoleChoices, User
 from task.models import Task
-from prompt.models import Conversation
 
 
 class FlagChoices(models.TextChoices):
@@ -41,10 +40,6 @@ class Submission(TimeStampedModel):
     html = models.TextField(null=True, blank=True, verbose_name="HTML代码")
     css = models.TextField(null=True, blank=True, verbose_name="CSS代码")
     js = models.TextField(null=True, blank=True, verbose_name="JS代码")
-    conversation = models.ForeignKey(
-        Conversation, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="submissions", verbose_name="对话"
-    )
     flag = models.CharField(
         max_length=10,
         choices=FlagChoices.choices,

@@ -36,27 +36,42 @@ def create_submission(request, payload: SubmissionIn):
     创建一个新的提交
     """
     task = get_object_or_404(Task, id=payload.task_id)
-    conversation = None
-    if payload.conversation_id:
-        from prompt.models import Conversation
-        conversation = get_object_or_404(
-            Conversation, id=payload.conversation_id, user=request.user
-        )
-        conversation.is_active = False
-        conversation.save(update_fields=["is_active"])
 
-    sub = Submission.objects.create(
+    if payload.prompt:
+        from prompt.models import Conversation, Message
+        from django.db.models import Count as _Count
+        conversation = (
+            Conversation.objects.filter(user=request.user, task=task)
+            .annotate(msg_count=_Count("messages"))
+            .order_by("-msg_count", "-created")
+            .first()
+        )
+        if not conversation:
+            conversation = Conversation.objects.create(
+                user=request.user, task=task, is_active=False
+            )
+        Message.objects.create(
+            conversation=conversation, role="user", content=payload.prompt, source="manual"
+        )
+        Message.objects.create(
+            conversation=conversation,
+            role="assistant",
+            content="",
+            code_html=payload.html,
+            code_css=payload.css,
+            code_js=payload.js,
+            source="manual",
+        )
+        from .classifier import classify_conversation_messages
+        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
+
+    Submission.objects.create(
         user=request.user,
         task=task,
         html=payload.html,
         css=payload.css,
         js=payload.js,
-        conversation=conversation,
     )
-
-    if conversation:
-        from .classifier import classify_conversation_messages
-        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
 
 
 @router.get("/", response=List[SubmissionOut])
@@ -69,7 +84,6 @@ def list_submissions(request, filters: SubmissionFilter = Query(...)):
     submissions = (
         Submission.objects.select_related("task", "user")
         .defer("html", "css", "js")
-        .exclude(conversation__isnull=False, html__isnull=True, css__isnull=True, js__isnull=True)
     )
 
     if filters.task_id:
@@ -143,7 +157,6 @@ def list_by_user_task(request, user_id: int, task_id: int):
     )
     return (
         Submission.objects.filter(user_id=user_id, task_id=task_id)
-        .exclude(conversation__isnull=False, html__isnull=True, css__isnull=True, js__isnull=True)
         .select_related("task", "user")
         .defer("html", "css", "js")
         .annotate(my_score=user_rating_subquery)

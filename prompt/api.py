@@ -6,6 +6,7 @@ from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 
+from django.db.models import Count
 from .models import Conversation, Message
 from .schemas import ConversationOut, MessageOut
 from account.models import RoleChoices
@@ -16,7 +17,9 @@ router = Router()
 @router.get("/conversations/", response=List[ConversationOut])
 @login_required
 def list_conversations(request, task_id: int = None, user_id: int = None):
-    convs = Conversation.objects.select_related("user", "task")
+    convs = Conversation.objects.select_related("user", "task").annotate(
+        msg_count=Count("messages")
+    )
     # Normal users can only see their own
     if request.user.role == "normal":
         convs = convs.filter(user=request.user)
@@ -24,6 +27,7 @@ def list_conversations(request, task_id: int = None, user_id: int = None):
         convs = convs.filter(user_id=user_id)
     if task_id:
         convs = convs.filter(task_id=task_id)
+    convs = convs.order_by("-msg_count", "-created")
     return [ConversationOut.from_conv(c) for c in convs]
 
 

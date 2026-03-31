@@ -23,6 +23,7 @@ class Message(models.Model):
         Conversation, on_delete=models.CASCADE, related_name="messages"
     )
     role = models.CharField(max_length=10)  # "user" or "assistant"
+    source = models.CharField(max_length=12, default="conversation")  # "conversation" or "manual"
     content = models.TextField()
     code_html = models.TextField(null=True, blank=True)
     code_css = models.TextField(null=True, blank=True)

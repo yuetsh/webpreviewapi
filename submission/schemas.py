@@ -8,7 +8,7 @@ class SubmissionIn(Schema):
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
-    conversation_id: Optional[UUID] = None
+    prompt: Optional[str] = None
 
 
 class SubmissionOut(Schema):
@@ -24,7 +24,6 @@ class SubmissionOut(Schema):
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
-    conversation_id: Optional[UUID] = None
     flag: Optional[str] = None
     zone: Optional[str] = None
     submit_count: int = 0
@@ -87,7 +86,6 @@ class SubmissionOut(Schema):
             "html": submission.html,
             "css": submission.css,
             "js": submission.js,
-            "conversation_id": submission.conversation_id,
             "flag": submission.flag,
             "created": submission.created.isoformat(),
             "modified": submission.modified.isoformat(),

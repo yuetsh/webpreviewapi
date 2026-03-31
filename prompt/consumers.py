@@ -1,6 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.db.models import Count
 from .models import Conversation, Message
 from .llm import stream_chat, extract_code
 
@@ -35,12 +36,6 @@ class PromptConsumer(AsyncWebsocketConsumer):
         msg_type = data.get("type", "message")
 
         if msg_type == "new_conversation":
-            self.conversation = await self.create_conversation()
-            await self.send(text_data=json.dumps({
-                "type": "init",
-                "conversation_id": str(self.conversation.id),
-                "messages": [],
-            }))
             return
 
         prompt = data.get("content", "").strip()
@@ -88,19 +83,15 @@ class PromptConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_or_create_conversation(self):
-        conv = Conversation.objects.filter(
-            user=self.user, task_id=self.task_id, is_active=True
-        ).first()
+        conv = (
+            Conversation.objects.filter(user=self.user, task_id=self.task_id)
+            .annotate(msg_count=Count("messages"))
+            .order_by("-msg_count", "-created")
+            .first()
+        )
         if not conv:
             conv = Conversation.objects.create(user=self.user, task_id=self.task_id)
         return conv
-
-    @database_sync_to_async
-    def create_conversation(self):
-        Conversation.objects.filter(
-            user=self.user, task_id=self.task_id, is_active=True
-        ).update(is_active=False)
-        return Conversation.objects.create(user=self.user, task_id=self.task_id)
 
     @database_sync_to_async
     def delete_message(self, message):
@@ -119,7 +110,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_history(self):
-        messages = self.conversation.messages.all()
+        messages = self.conversation.messages.filter(source="conversation")
         return [
             {
                 "role": m.role,
@@ -136,5 +127,5 @@ class PromptConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_history_for_llm(self):
-        messages = self.conversation.messages.all()
+        messages = self.conversation.messages.filter(source="conversation")
         return [{"role": m.role, "content": m.content} for m in messages]
