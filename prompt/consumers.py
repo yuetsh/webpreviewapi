@@ -39,6 +39,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
             return
 
         prompt = data.get("content", "").strip()
+        model = data.get("model", "")
         if not prompt:
             return
 
@@ -52,7 +53,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
             # Stream AI response
             full_response = ""
             try:
-                async for chunk in stream_chat(history):
+                async for chunk in stream_chat(history, model=model):
                     full_response += chunk
                     await self.send(text_data=json.dumps({
                         "type": "stream",
