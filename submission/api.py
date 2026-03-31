@@ -326,11 +326,21 @@ def get_submission(request, submission_id: UUID):
         ),
         id=submission_id,
     )
-    Submission.objects.filter(pk=submission.pk).update(
+    return submission
+
+
+@router.post("/{submission_id}/view")
+@login_required
+def increment_view(request, submission_id: UUID):
+    """
+    增加提交的浏览次数（仅在全屏预览时调用）
+    """
+    updated = Submission.objects.filter(pk=submission_id).update(
         view_count=F("view_count") + 1
     )
-    submission.view_count += 1  # 更新内存中的值，避免再次查询
-    return submission
+    if not updated:
+        raise HttpError(404, "提交不存在")
+    return {"ok": True}
 
 
 @router.put("/{submission_id}/score")
