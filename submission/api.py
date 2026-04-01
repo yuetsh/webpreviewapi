@@ -7,6 +7,7 @@ from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, F, IntegerField, Max, OuterRef, Q, Subquery
+from prompt.models import Conversation, Message
 
 
 from .schemas import (
@@ -38,11 +39,9 @@ def create_submission(request, payload: SubmissionIn):
     task = get_object_or_404(Task, id=payload.task_id)
 
     if payload.prompt:
-        from prompt.models import Conversation, Message
-        from django.db.models import Count as _Count
         conversation = (
             Conversation.objects.filter(user=request.user, task=task)
-            .annotate(msg_count=_Count("messages"))
+            .annotate(msg_count=Count("messages"))
             .order_by("-msg_count", "-created")
             .first()
         )
@@ -64,6 +63,16 @@ def create_submission(request, payload: SubmissionIn):
         )
         from .classifier import classify_conversation_messages
         threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
+    else:
+        conversation = (
+            Conversation.objects.filter(user=request.user, task=task)
+            .annotate(msg_count=Count("messages"))
+            .order_by("-msg_count", "-created")
+            .first()
+        )
+        if conversation:
+            from .classifier import classify_conversation_messages
+            threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
 
     Submission.objects.create(
         user=request.user,
