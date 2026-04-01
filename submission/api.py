@@ -323,6 +323,7 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         Submission.objects
         .filter(task=task, user_id__in=student_ids)
         .select_related("user")
+        .defer("html", "css", "js")
         .order_by("-view_count")[:5]
     )
     top_viewed = [
