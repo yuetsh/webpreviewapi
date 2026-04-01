@@ -19,6 +19,7 @@ from .schemas import (
     SubmissionOut,
     RatingScoreIn,
     TaskStatsOut,
+    TopViewedItem,
     UserTag,
 )
 
@@ -317,6 +318,23 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         yellow=flag_counts.get("yellow", 0),
     )
 
+    # Top 5 submissions by view_count (within filtered student_ids)
+    top_viewed_qs = (
+        Submission.objects
+        .filter(task=task, user_id__in=student_ids)
+        .select_related("user")
+        .order_by("-view_count")[:5]
+    )
+    top_viewed = [
+        TopViewedItem(
+            username=s.user.username,
+            classname=s.user.classname,
+            view_count=s.view_count,
+            submission_id=s.id,
+        )
+        for s in top_viewed_qs
+    ]
+
     return TaskStatsOut(
         submitted_count=submitted_count,
         unsubmitted_count=unsubmitted_count,
@@ -327,6 +345,7 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         submission_count_distribution=SubmissionCountBucket(**dist),
         flag_stats=flag_stats,
         classes=all_classes,
+        top_viewed=top_viewed,
     )
 
 
