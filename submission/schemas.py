@@ -131,6 +131,13 @@ class SubmissionCountBucket(Schema):
     count_4_plus: int  # users with 4+ submissions
 
 
+class TopViewedItem(Schema):
+    username: str
+    classname: str
+    view_count: int
+    submission_id: UUID
+
+
 class FlagStats(Schema):
     red: int
     blue: int
@@ -148,4 +155,5 @@ class TaskStatsOut(Schema):
     submission_count_distribution: SubmissionCountBucket
     flag_stats: FlagStats
     classes: list[str]
+    top_viewed: list[TopViewedItem]
 
