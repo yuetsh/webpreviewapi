@@ -49,3 +49,21 @@ class Challenge(Task):
         ordering = ("display",)
         verbose_name = "挑战"
         verbose_name_plural = verbose_name
+
+
+def task_asset_upload_to(instance, filename):
+    return f"tasks/{instance.task.task_type}/{instance.task.display}/{instance.name}"
+
+
+class TaskAsset(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="assets")
+    name = models.CharField(max_length=100, verbose_name="文件名")
+    file = models.FileField(upload_to=task_asset_upload_to, verbose_name="文件")
+
+    class Meta:
+        unique_together = ("task", "name")
+        verbose_name = "任务素材"
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f"{self.task} / {self.name}"
