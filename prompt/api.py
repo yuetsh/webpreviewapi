@@ -109,7 +109,7 @@ def delete_message_pair(request, message_id: int):
     """
     asst_msg = get_object_or_404(Message, id=message_id, role="assistant")
 
-    if asst_msg.conversation.user != request.user:
+    if asst_msg.conversation.user != request.user and request.user.role != RoleChoices.SUPER:
         raise HttpError(403, "只能删除自己的消息")
 
     # Find the preceding user message

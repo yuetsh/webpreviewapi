@@ -39,6 +39,7 @@ def create_submission(request, payload: SubmissionIn):
     """
     task = get_object_or_404(Task, id=payload.task_id)
 
+    manual_asst_msg = None
     if payload.prompt:
         conversation = (
             Conversation.objects.filter(user=request.user, task=task)
@@ -53,7 +54,7 @@ def create_submission(request, payload: SubmissionIn):
         Message.objects.create(
             conversation=conversation, role="user", content=payload.prompt, source="manual"
         )
-        Message.objects.create(
+        manual_asst_msg = Message.objects.create(
             conversation=conversation,
             role="assistant",
             content="",
@@ -83,8 +84,11 @@ def create_submission(request, payload: SubmissionIn):
         js=payload.js,
     )
 
-    # Link assistant message if provided
-    if payload.message_id:
+    # Link assistant message to submission
+    if manual_asst_msg:
+        manual_asst_msg.submission = submission
+        manual_asst_msg.save(update_fields=["submission"])
+    elif payload.message_id:
         try:
             msg = Message.objects.get(
                 id=payload.message_id,
@@ -207,11 +211,12 @@ def clear_all_flags(request):
 @login_required
 def delete_submission(request, submission_id: UUID):
     submission = get_object_or_404(Submission, id=submission_id)
-    if submission.user != request.user:
+    if submission.user != request.user and request.user.role != RoleChoices.SUPER:
         raise HttpError(403, "只能删除自己的提交")
 
-    # Delete linked message pair if present
+    # 找到关联的助手消息，再找前一条用户消息
     asst_msg = Message.objects.filter(submission=submission).first()
+    user_msg = None
     if asst_msg:
         user_msg = (
             Message.objects.filter(
@@ -222,11 +227,12 @@ def delete_submission(request, submission_id: UUID):
             .order_by("-created")
             .first()
         )
-        if user_msg:
-            user_msg.delete()
-        asst_msg.delete()
 
-    submission.delete()
+    submission.delete()  # CASCADE 自动删除关联的 asst_msg
+
+    if user_msg:
+        user_msg.delete()
+
     return {"message": "删除成功"}
 
 
