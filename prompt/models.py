@@ -1,5 +1,7 @@
 import uuid
 from django.db import models
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django_extensions.db.models import TimeStampedModel
 from account.models import User
 from task.models import Task
@@ -45,3 +47,10 @@ class Message(models.Model):
 
     def __str__(self):
         return f"[{self.role}] {self.content[:50]}"
+
+
+@receiver(pre_delete, sender=Message)
+def delete_linked_submission(sender, instance, **kwargs):
+    if instance.submission_id:
+        from submission.models import Submission
+        Submission.objects.filter(id=instance.submission_id).delete()
