@@ -43,6 +43,7 @@ def list_messages(request, conversation_id: UUID):
         {
             "id": m.id,
             "role": m.role,
+            "source": m.source,
             "content": m.content,
             "code_html": m.code_html,
             "code_css": m.code_css,

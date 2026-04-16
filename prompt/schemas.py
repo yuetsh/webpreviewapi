@@ -6,6 +6,7 @@ from ninja import Schema
 class MessageOut(Schema):
     id: int
     role: str
+    source: str
     content: str
     code_html: Optional[str] = None
     code_css: Optional[str] = None
