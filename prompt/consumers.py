@@ -17,7 +17,6 @@ class PromptConsumer(AsyncWebsocketConsumer):
         self.current_user_message = None
         await self.accept()
 
-        # Load or create conversation, send history
         self.conversation = await self.get_or_create_conversation()
         history = await self.get_history()
         await self.send(text_data=json.dumps({
@@ -43,14 +42,11 @@ class PromptConsumer(AsyncWebsocketConsumer):
         if not prompt:
             return
 
-        # Save user message
         self.current_user_message = await self.save_message("user", prompt)
 
         try:
-            # Build history for LLM
             history = await self.get_history_for_llm()
 
-            # Stream AI response
             full_response = ""
             try:
                 async for chunk in stream_chat(history, model=model):
@@ -66,15 +62,14 @@ class PromptConsumer(AsyncWebsocketConsumer):
                 }))
                 return
 
-            # Extract code and save assistant message
             code = extract_code(full_response)
-            await self.save_message("assistant", full_response, code)
+            assistant_msg = await self.save_message("assistant", full_response, code)
             self.current_user_message = None
 
-            # Send completion with extracted code
             await self.send(text_data=json.dumps({
                 "type": "complete",
                 "code": code,
+                "message_id": assistant_msg.id,
             }))
 
         finally:
@@ -114,6 +109,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
         messages = self.conversation.messages.filter(source="conversation")
         return [
             {
+                "id": m.id,
                 "role": m.role,
                 "content": m.content,
                 "code": {

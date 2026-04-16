@@ -97,3 +97,45 @@ def classify_batch(request, task_id: Optional[int] = None, force: bool = False):
     threading.Thread(target=classify_messages_batch, args=(ids,), daemon=True).start()
 
     return {"message": f"开始分类 {len(ids)} 条消息", "count": len(ids)}
+
+
+@router.delete("/messages/{message_id}/pair")
+@login_required
+def delete_message_pair(request, message_id: int):
+    """
+    Delete a message pair (assistant message + preceding user message) and
+    any linked submission. Only the conversation owner can do this.
+    """
+    asst_msg = get_object_or_404(Message, id=message_id, role="assistant")
+
+    if asst_msg.conversation.user != request.user:
+        raise HttpError(403, "只能删除自己的消息")
+
+    # Find the preceding user message
+    user_msg = (
+        Message.objects.filter(
+            conversation=asst_msg.conversation,
+            created__lt=asst_msg.created,
+            role="user",
+        )
+        .order_by("-created")
+        .first()
+    )
+
+    # Delete messages first, then submission
+    submission_id = asst_msg.submission_id  # capture before deletion nulls it
+
+    if user_msg:
+        user_msg.delete()
+    asst_msg.delete()
+
+    submission_deleted = False
+    if submission_id:
+        from submission.models import Submission as SubmissionModel
+        try:
+            SubmissionModel.objects.filter(id=submission_id).delete()
+            submission_deleted = True
+        except Exception:
+            pass
+
+    return {"deleted": True, "submission_deleted": submission_deleted}

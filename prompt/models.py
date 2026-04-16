@@ -32,6 +32,13 @@ class Message(models.Model):
     prompt_level = models.IntegerField(
         null=True, blank=True, default=None, db_index=True, verbose_name="提示词层级"
     )
+    submission = models.OneToOneField(
+        "submission.Submission",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="source_message",
+    )
 
     class Meta:
         ordering = ("created",)

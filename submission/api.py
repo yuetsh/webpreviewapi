@@ -75,13 +75,29 @@ def create_submission(request, payload: SubmissionIn):
             from .classifier import classify_conversation_messages
             threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
 
-    Submission.objects.create(
+    submission = Submission.objects.create(
         user=request.user,
         task=task,
         html=payload.html,
         css=payload.css,
         js=payload.js,
     )
+
+    # Link assistant message if provided
+    if payload.message_id:
+        try:
+            msg = Message.objects.get(
+                id=payload.message_id,
+                role="assistant",
+                conversation__user=request.user,
+                conversation__task=task,
+            )
+            msg.submission = submission
+            msg.save(update_fields=["submission"])
+        except Message.DoesNotExist:
+            pass  # invalid message_id — submission already created, silently skip
+
+    return {"id": str(submission.id)}
 
 
 @router.get("/", response=List[SubmissionOut])
@@ -193,6 +209,23 @@ def delete_submission(request, submission_id: UUID):
     submission = get_object_or_404(Submission, id=submission_id)
     if submission.user != request.user:
         raise HttpError(403, "只能删除自己的提交")
+
+    # Delete linked message pair if present
+    asst_msg = Message.objects.filter(submission=submission).first()
+    if asst_msg:
+        user_msg = (
+            Message.objects.filter(
+                conversation=asst_msg.conversation,
+                created__lt=asst_msg.created,
+                role="user",
+            )
+            .order_by("-created")
+            .first()
+        )
+        if user_msg:
+            user_msg.delete()
+        asst_msg.delete()
+
     submission.delete()
     return {"message": "删除成功"}
 

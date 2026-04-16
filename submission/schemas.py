@@ -9,6 +9,7 @@ class SubmissionIn(Schema):
     css: Optional[str] = None
     js: Optional[str] = None
     prompt: Optional[str] = None
+    message_id: Optional[int] = None  # 关联的 assistant message pk
 
 
 class SubmissionOut(Schema):
