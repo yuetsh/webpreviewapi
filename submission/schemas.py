@@ -198,6 +198,7 @@ class PromptRoundOut(Schema):
     question: str
     source: str
     prompt_level: Optional[int] = None
+    assistant_msg_id: Optional[int] = None
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None

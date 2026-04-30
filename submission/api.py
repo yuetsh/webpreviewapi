@@ -489,6 +489,43 @@ def get_showcase_detail(request, submission_id: UUID):
     }
 
 
+def _build_prompt_rounds(source_msg: Message):
+    messages = list(source_msg.conversation.messages.all().order_by("created", "id"))
+    try:
+        source_index = messages.index(source_msg)
+    except ValueError:
+        source_index = len(messages) - 1
+    messages = messages[: source_index + 1]
+
+    rounds = []
+    for i, msg in enumerate(messages):
+        if msg.role != "user":
+            continue
+        html = css = js = None
+        assistant_msg_id = None
+        for reply in messages[i + 1:]:
+            if reply.role == "user":
+                break
+            if reply.role == "assistant":
+                assistant_msg_id = reply.id
+                html = reply.code_html
+                css = reply.code_css
+                js = reply.code_js
+                break
+        rounds.append(
+            {
+                "question": msg.content,
+                "source": msg.source,
+                "prompt_level": msg.prompt_level,
+                "assistant_msg_id": assistant_msg_id,
+                "html": html,
+                "css": css,
+                "js": js,
+            }
+        )
+    return rounds
+
+
 @router.get("/showcase/{submission_id}/prompt-chain/", response=List[PromptRoundOut])
 @login_required
 def get_showcase_prompt_chain(request, submission_id: UUID):
@@ -501,32 +538,19 @@ def get_showcase_prompt_chain(request, submission_id: UUID):
     except Message.DoesNotExist:
         raise HttpError(404, "该作品没有关联提示词链")
 
-    messages = list(source_msg.conversation.messages.all().order_by("created"))
-    rounds = []
-    for i, msg in enumerate(messages):
-        if msg.role != "user":
-            continue
-        html = css = js = None
-        for reply in messages[i + 1:]:
-            if reply.role == "user":
-                break
-            if reply.role == "assistant":
-                html = reply.code_html
-                css = reply.code_css
-                js = reply.code_js
-                break
-        rounds.append(
-            {
-                "question": msg.content,
-                "source": msg.source,
-                "prompt_level": msg.prompt_level,
-                "html": html,
-                "css": css,
-                "js": js,
-            }
-        )
+    return _build_prompt_rounds(source_msg)
 
-    return rounds
+
+@router.get("/{submission_id}/prompt-chain", response=List[PromptRoundOut])
+@login_required
+def get_submission_prompt_chain(request, submission_id: UUID):
+    sub = get_object_or_404(Submission, id=submission_id)
+    try:
+        source_msg = Message.objects.select_related("conversation").get(submission=sub)
+    except Message.DoesNotExist:
+        raise HttpError(404, "该提交没有关联提示词链")
+
+    return _build_prompt_rounds(source_msg)
 
 
 @router.get("/{submission_id}", response=SubmissionOut)
@@ -600,5 +624,4 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     submission.flag = payload.flag
     submission.save(update_fields=["flag"])
     return {"flag": submission.flag}
-
 
