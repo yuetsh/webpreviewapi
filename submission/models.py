@@ -166,3 +166,49 @@ def update_submission_score_on_save(sender, instance, **kwargs):
     当Rating保存时，更新对应的Submission的平均分
     """
     instance.submission.update_score()
+
+
+class ItemOrdering(models.TextChoices):
+    MANUAL = "manual", "手动排序"
+    AWARDED_AT = "awarded_at", "授奖时间倒序"
+    SCORE = "score", "评分倒序"
+    VIEW_COUNT = "view_count", "浏览量倒序"
+
+
+class Award(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True, verbose_name="奖项名称")
+    description = models.TextField(blank=True, default="", verbose_name="奖项简介")
+    sort_order = models.IntegerField(default=0, db_index=True, verbose_name="排序值")
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    item_ordering = models.CharField(
+        max_length=20,
+        choices=ItemOrdering.choices,
+        default=ItemOrdering.MANUAL,
+        verbose_name="作品排序方式",
+    )
+
+    class Meta:
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return self.name
+
+
+class SubmissionAward(TimeStampedModel):
+    submission = models.ForeignKey(
+        Submission, on_delete=models.CASCADE, related_name="awards"
+    )
+    award = models.ForeignKey(
+        Award, on_delete=models.CASCADE, related_name="submission_awards"
+    )
+    sort_order = models.IntegerField(default=0, db_index=True, verbose_name="手动排序值")
+    awarded_at = models.DateTimeField(
+        auto_now_add=True, db_index=True, verbose_name="授奖时间"
+    )
+
+    class Meta:
+        unique_together = ("submission", "award")
+        ordering = ("sort_order",)
+
+    def __str__(self):
+        return f"{self.award.name} - {self.submission}"

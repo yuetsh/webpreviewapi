@@ -6,13 +6,27 @@ from ninja.errors import HttpError
 from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, F, IntegerField, Max, OuterRef, Q, Subquery
+from django.db.models import (
+    Avg,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+)
 from prompt.models import Conversation, Message
 
 
 from .schemas import (
     FlagIn,
     FlagStats,
+    AwardOut,
+    PromptRoundOut,
+    ShowcaseDetailOut,
+    ShowcaseItemOut,
     SubmissionCountBucket,
     SubmissionFilter,
     SubmissionIn,
@@ -24,7 +38,7 @@ from .schemas import (
 )
 
 
-from .models import Rating, Submission
+from .models import Award, ItemOrdering, Rating, Submission, SubmissionAward
 from task.models import Task
 from account.models import RoleChoices, User
 
@@ -389,6 +403,132 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
     )
 
 
+@router.get("/showcase/", response=List[AwardOut])
+@login_required
+def list_showcase(request):
+    ordering_map = {
+        ItemOrdering.MANUAL: "sort_order",
+        ItemOrdering.AWARDED_AT: "-awarded_at",
+        ItemOrdering.SCORE: "-submission__score",
+        ItemOrdering.VIEW_COUNT: "-submission__view_count",
+    }
+    awards = Award.objects.filter(is_active=True).order_by("sort_order")
+    result = []
+
+    for award in awards:
+        order_field = ordering_map.get(award.item_ordering, "sort_order")
+        items_qs = (
+            SubmissionAward.objects.filter(award=award)
+            .select_related("submission", "submission__user", "submission__task")
+            .annotate(
+                has_prompt_chain=Exists(
+                    Message.objects.filter(submission_id=OuterRef("submission_id"))
+                )
+            )
+            .order_by(order_field)
+        )
+        items = list(items_qs)
+        if not items:
+            continue
+        result.append(
+            {
+                "id": award.id,
+                "name": award.name,
+                "description": award.description,
+                "item_ordering": award.item_ordering,
+                "items": [
+                    {
+                        "submission_id": sa.submission_id,
+                        "username": sa.submission.user.username,
+                        "task_title": sa.submission.task.title,
+                        "task_display": sa.submission.task.display,
+                        "score": sa.submission.score,
+                        "view_count": sa.submission.view_count,
+                        "html": sa.submission.html,
+                        "css": sa.submission.css,
+                        "js": sa.submission.js,
+                        "has_prompt_chain": sa.has_prompt_chain,
+                    }
+                    for sa in items
+                ],
+            }
+        )
+
+    return result
+
+
+@router.get("/showcase/{submission_id}/", response=ShowcaseDetailOut)
+@login_required
+def get_showcase_detail(request, submission_id: UUID):
+    if not SubmissionAward.objects.filter(submission_id=submission_id).exists():
+        raise HttpError(404, "作品不存在或未授奖")
+
+    sub = get_object_or_404(
+        Submission.objects.select_related("user", "task"),
+        id=submission_id,
+    )
+    has_chain = Message.objects.filter(submission=sub).exists()
+    award_names = list(
+        SubmissionAward.objects.filter(submission=sub)
+        .select_related("award")
+        .values_list("award__name", flat=True)
+    )
+
+    return {
+        "submission_id": sub.id,
+        "username": sub.user.username,
+        "task_title": sub.task.title,
+        "task_display": sub.task.display,
+        "score": sub.score,
+        "view_count": sub.view_count,
+        "html": sub.html,
+        "css": sub.css,
+        "js": sub.js,
+        "awards": award_names,
+        "has_prompt_chain": has_chain,
+    }
+
+
+@router.get("/showcase/{submission_id}/prompt-chain/", response=List[PromptRoundOut])
+@login_required
+def get_showcase_prompt_chain(request, submission_id: UUID):
+    if not SubmissionAward.objects.filter(submission_id=submission_id).exists():
+        raise HttpError(404, "作品不存在或未授奖")
+
+    sub = get_object_or_404(Submission, id=submission_id)
+    try:
+        source_msg = Message.objects.select_related("conversation").get(submission=sub)
+    except Message.DoesNotExist:
+        raise HttpError(404, "该作品没有关联提示词链")
+
+    messages = list(source_msg.conversation.messages.all().order_by("created"))
+    rounds = []
+    for i, msg in enumerate(messages):
+        if msg.role != "user":
+            continue
+        html = css = js = None
+        for reply in messages[i + 1:]:
+            if reply.role == "user":
+                break
+            if reply.role == "assistant":
+                html = reply.code_html
+                css = reply.code_css
+                js = reply.code_js
+                break
+        rounds.append(
+            {
+                "question": msg.content,
+                "source": msg.source,
+                "prompt_level": msg.prompt_level,
+                "html": html,
+                "css": css,
+                "js": js,
+            }
+        )
+
+    return rounds
+
+
 @router.get("/{submission_id}", response=SubmissionOut)
 @login_required
 def get_submission(request, submission_id: UUID):
@@ -460,7 +600,5 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     submission.flag = payload.flag
     submission.save(update_fields=["flag"])
     return {"flag": submission.flag}
-
-
 
 

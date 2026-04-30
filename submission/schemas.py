@@ -158,3 +158,46 @@ class TaskStatsOut(Schema):
     classes: list[str]
     top_viewed: list[TopViewedItem]
 
+
+class ShowcaseItemOut(Schema):
+    submission_id: UUID
+    username: str
+    task_title: str
+    task_display: int
+    score: float
+    view_count: int
+    html: Optional[str] = None
+    css: Optional[str] = None
+    js: Optional[str] = None
+    has_prompt_chain: bool
+
+
+class AwardOut(Schema):
+    id: int
+    name: str
+    description: str
+    item_ordering: str
+    items: list[ShowcaseItemOut]
+
+
+class ShowcaseDetailOut(Schema):
+    submission_id: UUID
+    username: str
+    task_title: str
+    task_display: int
+    score: float
+    view_count: int
+    html: Optional[str] = None
+    css: Optional[str] = None
+    js: Optional[str] = None
+    awards: list[str]
+    has_prompt_chain: bool
+
+
+class PromptRoundOut(Schema):
+    question: str
+    source: str
+    prompt_level: Optional[int] = None
+    html: Optional[str] = None
+    css: Optional[str] = None
+    js: Optional[str] = None
