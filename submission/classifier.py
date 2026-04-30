@@ -37,6 +37,7 @@ def _call_llm(content: str) -> int | None:
             ],
             max_tokens=10,
             stream=False,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         text = response.choices[0].message.content or ""
         match = re.search(r"[1-6]", text)
