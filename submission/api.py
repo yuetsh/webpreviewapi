@@ -17,16 +17,23 @@ from django.db.models import (
     Q,
     Subquery,
 )
+from account.decorators import admin_required
 from prompt.models import Conversation, Message
 
 
 from .schemas import (
+    AwardItemIn,
+    AwardItemManageOut,
+    AwardItemUpdateIn,
+    AwardManageIn,
+    AwardManageOut,
     FlagIn,
     FlagStats,
     AwardOut,
     PromptRoundOut,
     ShowcaseDetailOut,
     ShowcaseItemOut,
+    ShowcaseSubmissionLookupOut,
     SubmissionCountBucket,
     SubmissionFilter,
     SubmissionIn,
@@ -43,6 +50,67 @@ from task.models import Task
 from account.models import RoleChoices, User
 
 router = Router()
+
+
+def _validate_item_ordering(value: str):
+    if value not in ItemOrdering.values:
+        raise HttpError(400, "无效的作品排序方式")
+
+
+def _award_manage_out(award: Award):
+    return {
+        "id": award.id,
+        "name": award.name,
+        "description": award.description,
+        "sort_order": award.sort_order,
+        "is_active": award.is_active,
+        "item_ordering": award.item_ordering,
+        "item_count": getattr(award, "item_count", None)
+        if getattr(award, "item_count", None) is not None
+        else award.submission_awards.count(),
+    }
+
+
+def _award_item_ordering(award: Award):
+    ordering_map = {
+        ItemOrdering.MANUAL: ("sort_order", "id"),
+        ItemOrdering.AWARDED_AT: ("-awarded_at", "sort_order", "id"),
+        ItemOrdering.SCORE: ("-submission__score", "sort_order", "id"),
+        ItemOrdering.VIEW_COUNT: ("-submission__view_count", "sort_order", "id"),
+    }
+    return ordering_map.get(award.item_ordering, ("sort_order", "id"))
+
+
+def _award_item_manage_out(item: SubmissionAward):
+    has_prompt_chain = getattr(item, "has_prompt_chain", None)
+    if has_prompt_chain is None:
+        has_prompt_chain = Message.objects.filter(
+            submission_id=item.submission_id
+        ).exists()
+    return {
+        "id": item.id,
+        "submission_id": item.submission_id,
+        "username": item.submission.user.username,
+        "task_title": item.submission.task.title,
+        "task_display": item.submission.task.display,
+        "score": item.submission.score,
+        "view_count": item.submission.view_count,
+        "sort_order": item.sort_order,
+        "awarded_at": item.awarded_at,
+        "has_prompt_chain": has_prompt_chain,
+    }
+
+
+def _showcase_submission_lookup_out(submission: Submission):
+    return {
+        "submission_id": submission.id,
+        "username": submission.user.username,
+        "task_title": submission.task.title,
+        "task_display": submission.task.display,
+        "score": submission.score,
+        "view_count": submission.view_count,
+        "has_prompt_chain": Message.objects.filter(submission=submission).exists(),
+    }
 
 
 @router.post("/")
@@ -457,10 +525,141 @@ def list_showcase(request):
     return result
 
 
+@router.get("/showcase/manage/awards", response=List[AwardManageOut])
+@admin_required
+def list_manage_awards(request):
+    awards = Award.objects.annotate(
+        item_count=Count("submission_awards")
+    ).order_by("sort_order", "id")
+    return [_award_manage_out(award) for award in awards]
+
+
+@router.post("/showcase/manage/awards", response=AwardManageOut)
+@admin_required
+def create_manage_award(request, payload: AwardManageIn):
+    _validate_item_ordering(payload.item_ordering)
+    award = Award.objects.create(**payload.dict())
+    award.item_count = 0
+    return _award_manage_out(award)
+
+
+@router.put("/showcase/manage/awards/{award_id}", response=AwardManageOut)
+@admin_required
+def update_manage_award(request, award_id: int, payload: AwardManageIn):
+    _validate_item_ordering(payload.item_ordering)
+    award = get_object_or_404(Award, id=award_id)
+    award.name = payload.name
+    award.description = payload.description
+    award.sort_order = payload.sort_order
+    award.is_active = payload.is_active
+    award.item_ordering = payload.item_ordering
+    award.save(
+        update_fields=[
+            "name",
+            "description",
+            "sort_order",
+            "is_active",
+            "item_ordering",
+        ]
+    )
+    award.item_count = award.submission_awards.count()
+    return _award_manage_out(award)
+
+
+@router.delete("/showcase/manage/awards/{award_id}")
+@admin_required
+def delete_manage_award(request, award_id: int):
+    award = get_object_or_404(Award, id=award_id)
+    award.delete()
+    return {"message": "删除成功"}
+
+
+@router.get(
+    "/showcase/manage/submissions/{submission_id}",
+    response=ShowcaseSubmissionLookupOut,
+)
+@admin_required
+def get_manage_submission(request, submission_id: UUID):
+    submission = get_object_or_404(
+        Submission.objects.select_related("user", "task"),
+        id=submission_id,
+    )
+    return _showcase_submission_lookup_out(submission)
+
+
+@router.get(
+    "/showcase/manage/awards/{award_id}/items",
+    response=List[AwardItemManageOut],
+)
+@admin_required
+def list_manage_award_items(request, award_id: int):
+    award = get_object_or_404(Award, id=award_id)
+    items = (
+        SubmissionAward.objects.filter(award=award)
+        .select_related("submission", "submission__user", "submission__task")
+        .annotate(
+            has_prompt_chain=Exists(
+                Message.objects.filter(submission_id=OuterRef("submission_id"))
+            )
+        )
+        .order_by(*_award_item_ordering(award))
+    )
+    return [_award_item_manage_out(item) for item in items]
+
+
+@router.post(
+    "/showcase/manage/awards/{award_id}/items",
+    response=AwardItemManageOut,
+)
+@admin_required
+def create_manage_award_item(request, award_id: int, payload: AwardItemIn):
+    award = get_object_or_404(Award, id=award_id)
+    submission = get_object_or_404(
+        Submission.objects.select_related("user", "task"),
+        id=payload.submission_id,
+    )
+    item, created = SubmissionAward.objects.get_or_create(
+        award=award,
+        submission=submission,
+        defaults={"sort_order": payload.sort_order},
+    )
+    if not created:
+        raise HttpError(400, "该作品已在奖项中")
+    item.submission = submission
+    return _award_item_manage_out(item)
+
+
+@router.put("/showcase/manage/items/{item_id}", response=AwardItemManageOut)
+@admin_required
+def update_manage_award_item(request, item_id: int, payload: AwardItemUpdateIn):
+    item = get_object_or_404(
+        SubmissionAward.objects.select_related(
+            "submission",
+            "submission__user",
+            "submission__task",
+        ),
+        id=item_id,
+    )
+    item.sort_order = payload.sort_order
+    item.save(update_fields=["sort_order"])
+    return _award_item_manage_out(item)
+
+
+@router.delete("/showcase/manage/items/{item_id}")
+@admin_required
+def delete_manage_award_item(request, item_id: int):
+    item = get_object_or_404(SubmissionAward, id=item_id)
+    item.delete()
+    return {"message": "删除成功"}
+
+
 @router.get("/showcase/{submission_id}/", response=ShowcaseDetailOut)
 @login_required
 def get_showcase_detail(request, submission_id: UUID):
-    if not SubmissionAward.objects.filter(submission_id=submission_id).exists():
+    if not SubmissionAward.objects.filter(
+        submission_id=submission_id,
+        award__is_active=True,
+    ).exists():
         raise HttpError(404, "作品不存在或未授奖")
 
     sub = get_object_or_404(
@@ -470,6 +669,7 @@ def get_showcase_detail(request, submission_id: UUID):
     has_chain = Message.objects.filter(submission=sub).exists()
     award_names = list(
         SubmissionAward.objects.filter(submission=sub)
+        .filter(award__is_active=True)
         .select_related("award")
         .values_list("award__name", flat=True)
     )
@@ -529,7 +729,10 @@ def _build_prompt_rounds(source_msg: Message):
 @router.get("/showcase/{submission_id}/prompt-chain/", response=List[PromptRoundOut])
 @login_required
 def get_showcase_prompt_chain(request, submission_id: UUID):
-    if not SubmissionAward.objects.filter(submission_id=submission_id).exists():
+    if not SubmissionAward.objects.filter(
+        submission_id=submission_id,
+        award__is_active=True,
+    ).exists():
         raise HttpError(404, "作品不存在或未授奖")
 
     sub = get_object_or_404(Submission, id=submission_id)
@@ -624,4 +827,3 @@ def update_flag(request, submission_id: UUID, payload: FlagIn):
     submission.flag = payload.flag
     submission.save(update_fields=["flag"])
     return {"flag": submission.flag}
-

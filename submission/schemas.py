@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, Literal
 from ninja import Schema
 from uuid import UUID
@@ -178,6 +179,56 @@ class AwardOut(Schema):
     description: str
     item_ordering: str
     items: list[ShowcaseItemOut]
+
+
+class AwardManageIn(Schema):
+    name: str
+    description: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+    item_ordering: str = "manual"
+
+
+class AwardManageOut(Schema):
+    id: int
+    name: str
+    description: str
+    sort_order: int
+    is_active: bool
+    item_ordering: str
+    item_count: int
+
+
+class AwardItemIn(Schema):
+    submission_id: UUID
+    sort_order: int = 0
+
+
+class AwardItemUpdateIn(Schema):
+    sort_order: int = 0
+
+
+class ShowcaseSubmissionLookupOut(Schema):
+    submission_id: UUID
+    username: str
+    task_title: str
+    task_display: int
+    score: float
+    view_count: int
+    has_prompt_chain: bool
+
+
+class AwardItemManageOut(Schema):
+    id: int
+    submission_id: UUID
+    username: str
+    task_title: str
+    task_display: int
+    score: float
+    view_count: int
+    sort_order: int
+    awarded_at: datetime
+    has_prompt_chain: bool
 
 
 class ShowcaseDetailOut(Schema):
