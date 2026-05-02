@@ -160,6 +160,48 @@ class TaskStatsOut(Schema):
     top_viewed: list[TopViewedItem]
 
 
+class GradebookTask(Schema):
+    id: int
+    display: int
+    title: str
+    task_type: Literal["tutorial", "challenge"]
+    submitted_count: int
+    coverage: float
+    included: bool
+
+
+class GradebookCell(Schema):
+    score: float
+    submitted: bool
+    submission_id: Optional[UUID] = None
+
+
+class GradebookRow(Schema):
+    user_id: int
+    username: str
+    classname: str
+    rank: int
+    grade: Literal["A", "B", "C", "D", "E"]
+    scores: dict[int, GradebookCell]
+    tutorial_total: float
+    challenge_total: float
+    total_score: float
+    average_score: Optional[float]
+    submitted_task_count: int
+    missing_task_count: int
+
+
+class GradebookOut(Schema):
+    classname: str
+    classes: list[str]
+    task_count: int
+    included_task_count: int
+    student_count: int
+    coverage_threshold_count: int
+    tasks: list[GradebookTask]
+    rows: list[GradebookRow]
+
+
 class ShowcaseItemOut(Schema):
     submission_id: UUID
     username: str

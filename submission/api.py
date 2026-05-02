@@ -1,6 +1,9 @@
+import csv
 import threading
-from typing import List, Optional
+from typing import List, Literal, Optional
+from urllib.parse import quote
 from uuid import UUID
+from django.http import HttpResponse
 from ninja import Router, Query
 from ninja.errors import HttpError
 from ninja.pagination import paginate
@@ -30,6 +33,7 @@ from .schemas import (
     FlagIn,
     FlagStats,
     AwardOut,
+    GradebookOut,
     PromptRoundOut,
     ShowcaseDetailOut,
     ShowcaseItemOut,
@@ -46,6 +50,7 @@ from .schemas import (
 
 
 from .models import Award, ItemOrdering, Rating, Submission, SubmissionAward
+from .gradebook import GradebookFilters, build_gradebook, gradebook_csv_rows
 from task.models import Task
 from account.models import RoleChoices, User
 
@@ -469,6 +474,54 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
         classes=all_classes,
         top_viewed=top_viewed,
     )
+
+
+@router.get("/gradebook/", response=GradebookOut)
+@admin_required
+def get_gradebook(
+    request,
+    classname: str = "",
+    task_type: Optional[Literal["tutorial", "challenge"]] = None,
+    username: Optional[str] = None,
+    include_all_tasks: bool = False,
+):
+    return build_gradebook(
+        GradebookFilters(
+            classname=classname,
+            task_type=task_type,
+            username=username,
+            include_all_tasks=include_all_tasks,
+        )
+    )
+
+
+@router.get("/gradebook/export/")
+@admin_required
+def export_gradebook(
+    request,
+    classname: str = "",
+    task_type: Optional[Literal["tutorial", "challenge"]] = None,
+    username: Optional[str] = None,
+    include_all_tasks: bool = False,
+):
+    gradebook = build_gradebook(
+        GradebookFilters(
+            classname=classname,
+            task_type=task_type,
+            username=username,
+            include_all_tasks=include_all_tasks,
+        )
+    )
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    filename = f"gradebook-{gradebook['classname']}.csv"
+    response["Content-Disposition"] = (
+        f"attachment; filename*=UTF-8''{quote(filename)}"
+    )
+    response.write("\ufeff")
+    writer = csv.writer(response)
+    for row in gradebook_csv_rows(gradebook):
+        writer.writerow(row)
+    return response
 
 
 @router.get("/showcase/", response=List[AwardOut])
