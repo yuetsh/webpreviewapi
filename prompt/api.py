@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 
 from django.db.models import Count
 from .models import Conversation, Message
-from .schemas import ConversationOut, MessageOut
+from .schemas import ConversationOut, MessageOut, PromptHistoryItemOut
 from account.models import RoleChoices
 
 router = Router()
@@ -53,6 +53,58 @@ def list_messages(request, conversation_id: UUID):
         }
         for m in messages
     ]
+
+
+@router.get("/history/{task_id}", response=List[PromptHistoryItemOut])
+@login_required
+def list_prompt_history(request, task_id: int):
+    """
+    获取当前用户在某任务下的历史对话轮次。
+
+    只返回用户提示词和后一条 assistant 消息中的页面代码，用于前端渲染缩略图。
+    """
+    conversations = Conversation.objects.filter(
+        user=request.user,
+        task_id=task_id,
+    ).prefetch_related("messages")
+
+    items = []
+    for conv in conversations:
+        messages = list(conv.messages.all().order_by("created", "id"))
+        for idx, user_msg in enumerate(messages):
+            if user_msg.role != "user":
+                continue
+
+            assistant_msg = None
+            for reply in messages[idx + 1:]:
+                if reply.role == "user":
+                    break
+                if reply.role == "assistant":
+                    assistant_msg = reply
+                    break
+
+            if not assistant_msg:
+                continue
+
+            items.append(
+                (
+                    user_msg.created,
+                    {
+                        "user_message_id": user_msg.id,
+                        "assistant_message_id": assistant_msg.id,
+                        "submission_id": assistant_msg.submission_id,
+                        "source": user_msg.source,
+                        "prompt": user_msg.content,
+                        "prompt_level": user_msg.prompt_level,
+                        "code_html": assistant_msg.code_html,
+                        "code_css": assistant_msg.code_css,
+                        "code_js": assistant_msg.code_js,
+                        "created": user_msg.created.isoformat(),
+                    },
+                )
+            )
+
+    return [item for _, item in sorted(items, key=lambda row: row[0], reverse=True)]
 
 
 @router.post("/conversations/{conversation_id}/classify")

@@ -15,6 +15,19 @@ class MessageOut(Schema):
     created: str
 
 
+class PromptHistoryItemOut(Schema):
+    user_message_id: int
+    assistant_message_id: int
+    submission_id: Optional[UUID] = None
+    source: str
+    prompt: str
+    prompt_level: Optional[int] = None
+    code_html: Optional[str] = None
+    code_css: Optional[str] = None
+    code_js: Optional[str] = None
+    created: str
+
+
 class ConversationOut(Schema):
     id: UUID
     user_id: int

@@ -175,3 +175,96 @@ class DeleteMessagePairTest(TestCase):
         self.client.force_login(other)
         resp = self.client.delete(f"/api/prompt/messages/{self.asst_msg.id}/pair")
         self.assertEqual(resp.status_code, 403)
+
+
+class PromptHistoryTest(TestCase):
+    def setUp(self):
+        self.user = _make_user("history-user")
+        self.other = _make_user("history-other")
+        self.task = _make_task()
+        self.other_task = Task.objects.create(
+            title="Other Task", task_type="challenge", display=2, content=""
+        )
+
+    def _pair(
+        self,
+        user,
+        task,
+        prompt,
+        source="conversation",
+        html="<main>page</main>",
+        css="main { color: red; }",
+        js="",
+    ):
+        conv = Conversation.objects.create(user=user, task=task)
+        user_msg = Message.objects.create(
+            conversation=conv,
+            role="user",
+            source=source,
+            content=prompt,
+        )
+        asst_msg = Message.objects.create(
+            conversation=conv,
+            role="assistant",
+            source=source,
+            content="" if source == "manual" else "answer",
+            code_html=html,
+            code_css=css,
+            code_js=js,
+        )
+        return user_msg, asst_msg
+
+    def test_history_returns_ai_and_manual_prompt_rounds_with_page_code(self):
+        ai_user, ai_asst = self._pair(self.user, self.task, "做一个登录页")
+        manual_user, manual_asst = self._pair(
+            self.user,
+            self.task,
+            "我让外部 AI 做一个卡片",
+            source="manual",
+            html="<section>card</section>",
+        )
+
+        self.client.force_login(self.user)
+        resp = self.client.get(f"/api/prompt/history/{self.task.id}")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        ids = {item["user_message_id"] for item in data}
+        self.assertEqual(ids, {ai_user.id, manual_user.id})
+        by_source = {item["source"]: item for item in data}
+        self.assertEqual(by_source["conversation"]["assistant_message_id"], ai_asst.id)
+        self.assertEqual(by_source["conversation"]["prompt"], "做一个登录页")
+        self.assertEqual(by_source["manual"]["assistant_message_id"], manual_asst.id)
+        self.assertEqual(by_source["manual"]["code_html"], "<section>card</section>")
+        self.assertNotIn("content", by_source["conversation"])
+
+    def test_history_is_scoped_to_current_user_and_task(self):
+        own_user, _ = self._pair(self.user, self.task, "自己的提示词")
+        self._pair(self.other, self.task, "别人的提示词")
+        self._pair(self.user, self.other_task, "其他任务提示词")
+
+        self.client.force_login(self.user)
+        resp = self.client.get(f"/api/prompt/history/{self.task.id}")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["user_message_id"], own_user.id)
+        self.assertEqual(data[0]["prompt"], "自己的提示词")
+
+    def test_history_keeps_rounds_without_page_code(self):
+        conv = Conversation.objects.create(user=self.user, task=self.task)
+        user_msg = Message.objects.create(conversation=conv, role="user", content="只聊天")
+        asst_msg = Message.objects.create(conversation=conv, role="assistant", content="没有代码")
+
+        self.client.force_login(self.user)
+        resp = self.client.get(f"/api/prompt/history/{self.task.id}")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["user_message_id"], user_msg.id)
+        self.assertEqual(data[0]["assistant_message_id"], asst_msg.id)
+        self.assertIsNone(data[0]["code_html"])
+        self.assertIsNone(data[0]["code_css"])
+        self.assertIsNone(data[0]["code_js"])
