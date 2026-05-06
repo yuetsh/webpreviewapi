@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django_extensions.db.models import TimeStampedModel
 
 
@@ -41,6 +42,18 @@ class Tutorial(Task):
 class Challenge(Task):
     score = models.IntegerField(default=0)
     pass_score = models.FloatField(null=True, blank=True, verbose_name="通过分数线")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="authored_challenges",
+        verbose_name="出题人",
+    )
+
+    @property
+    def author_name(self):
+        return self.author.username if self.author_id else ""
 
     def __str__(self):
         return self.title

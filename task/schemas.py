@@ -28,6 +28,7 @@ class ChallengeSlim(Schema):
     score: int
     pass_score: Optional[float] = None
     is_public: bool
+    author_name: Optional[str] = None
 
 
 class ChallengeDisplay(ChallengeSlim):
@@ -35,6 +36,8 @@ class ChallengeDisplay(ChallengeSlim):
 
 
 class ChallengeAll(ModelSchema):
+    author_name: Optional[str] = None
+
     class Meta:
         model = Challenge
         fields = "__all__"
