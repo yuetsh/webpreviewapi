@@ -88,7 +88,7 @@ def list_prompt_history(request, task_id: int):
 
             items.append(
                 (
-                    user_msg.created,
+                    (user_msg.created, user_msg.id),
                     {
                         "user_message_id": user_msg.id,
                         "assistant_message_id": assistant_msg.id,
@@ -104,7 +104,7 @@ def list_prompt_history(request, task_id: int):
                 )
             )
 
-    return [item for _, item in sorted(items, key=lambda row: row[0], reverse=True)]
+    return [item for _, item in sorted(items, key=lambda row: row[0])]
 
 
 @router.post("/conversations/{conversation_id}/classify")

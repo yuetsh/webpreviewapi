@@ -1,5 +1,7 @@
+from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from task.models import Task
 from submission.models import Submission
 from prompt.models import Conversation, Message
@@ -237,6 +239,31 @@ class PromptHistoryTest(TestCase):
         self.assertEqual(by_source["manual"]["assistant_message_id"], manual_asst.id)
         self.assertEqual(by_source["manual"]["code_html"], "<section>card</section>")
         self.assertNotIn("content", by_source["conversation"])
+
+    def test_history_is_ordered_old_to_new(self):
+        newest_user, newest_asst = self._pair(self.user, self.task, "第三条")
+        oldest_user, oldest_asst = self._pair(self.user, self.task, "第一条")
+        middle_user, middle_asst = self._pair(self.user, self.task, "第二条")
+        base = timezone.now()
+        for offset, user_msg, asst_msg in [
+            (0, oldest_user, oldest_asst),
+            (1, middle_user, middle_asst),
+            (2, newest_user, newest_asst),
+        ]:
+            user_created = base + timedelta(minutes=offset)
+            Message.objects.filter(id=user_msg.id).update(created=user_created)
+            Message.objects.filter(id=asst_msg.id).update(
+                created=user_created + timedelta(seconds=1)
+            )
+
+        self.client.force_login(self.user)
+        resp = self.client.get(f"/api/prompt/history/{self.task.id}")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            [item["prompt"] for item in resp.json()],
+            ["第一条", "第二条", "第三条"],
+        )
 
     def test_history_is_scoped_to_current_user_and_task(self):
         own_user, _ = self._pair(self.user, self.task, "自己的提示词")
