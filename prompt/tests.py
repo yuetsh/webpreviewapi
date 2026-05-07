@@ -295,3 +295,28 @@ class PromptHistoryTest(TestCase):
         self.assertIsNone(data[0]["code_html"])
         self.assertIsNone(data[0]["code_css"])
         self.assertIsNone(data[0]["code_js"])
+
+
+from prompt.llm import parse_guidance_response
+
+
+class ParseGuidanceResponseTest(TestCase):
+    def test_ready_prefix_with_newline_stripped(self):
+        content, is_ready = parse_guidance_response("[READY]\n很好，可以生成了！")
+        self.assertEqual(content, "很好，可以生成了！")
+        self.assertTrue(is_ready)
+
+    def test_ready_prefix_without_newline_stripped(self):
+        content, is_ready = parse_guidance_response("[READY]很好，可以生成了！")
+        self.assertEqual(content, "很好，可以生成了！")
+        self.assertTrue(is_ready)
+
+    def test_no_ready_prefix_unchanged(self):
+        content, is_ready = parse_guidance_response("你的提示词不够具体，请问...")
+        self.assertEqual(content, "你的提示词不够具体，请问...")
+        self.assertFalse(is_ready)
+
+    def test_empty_string(self):
+        content, is_ready = parse_guidance_response("")
+        self.assertEqual(content, "")
+        self.assertFalse(is_ready)

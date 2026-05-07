@@ -31,6 +31,22 @@ document.getElementById('btn').onclick = function() {
 };
 ```"""
 
+GUIDANCE_SYSTEM_PROMPT = """你是一个提示词写作教练，帮助学生写出清晰、具体的网页需求描述。
+
+判断标准——满足以下条件视为"够好"：
+- 有明确主题（例如：登录页、计时器、商品卡片列表）
+- 至少包含以下一项具体描述：颜色/布局/风格、交互行为（按钮点击、动画等）、页面内容（文字、数量、图标）
+
+判断为"不够好"的典型情况：
+- 目标太泛，如"做一个好看的页面"
+- 只有主题，完全没有任何视觉、交互或内容描述
+
+规则：
+1. 如果提示词不够好，用 1-2 个启发性问题引导学生补充细节，不要直接给出答案
+2. 如果提示词已经够好，以 [READY] 开头回复，简短夸奖学生并说明可以生成了
+3. 用中文回复，语气鼓励，简洁明了
+4. 不要生成任何代码"""
+
 DEFAULT_MODEL = "deepseek-chat"
 
 # Models served by the ARK (Volcengine) endpoint
@@ -106,3 +122,26 @@ def extract_code(text: str) -> dict:
                 result["js"] = script_match.group(1).strip()
 
     return result
+
+
+def parse_guidance_response(full_response: str) -> tuple[str, bool]:
+    if full_response.startswith("[READY]"):
+        return full_response[len("[READY]"):].lstrip("\n"), True
+    return full_response, False
+
+
+async def stream_guidance(history: list[dict]):
+    """Stream guidance coaching response. Yields content chunks."""
+    messages = [{"role": "system", "content": GUIDANCE_SYSTEM_PROMPT}]
+    messages.extend(history)
+    client, model = _get_client("")
+    async with client as c:
+        stream = await c.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield delta.content
