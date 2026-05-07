@@ -297,10 +297,16 @@ class PromptHistoryTest(TestCase):
         self.assertIsNone(data[0]["code_js"])
 
 
-from prompt.llm import parse_guidance_response
+from prompt.llm import GUIDANCE_SYSTEM_PROMPT, parse_guidance_response
 
 
 class ParseGuidanceResponseTest(TestCase):
+    def test_guidance_prompt_asks_for_bold_keywords(self):
+        self.assertIn("Markdown", GUIDANCE_SYSTEM_PROMPT)
+        self.assertIn("[READY] 不要加粗", GUIDANCE_SYSTEM_PROMPT)
+        for keyword in ("**主题**", "**视觉**", "**交互**", "**内容**", "**可以生成**"):
+            self.assertIn(keyword, GUIDANCE_SYSTEM_PROMPT)
+
     def test_ready_prefix_with_newline_stripped(self):
         content, is_ready = parse_guidance_response("[READY]\n很好，可以生成了！")
         self.assertEqual(content, "很好，可以生成了！")
