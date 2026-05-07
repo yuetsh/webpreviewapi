@@ -1,23 +1,29 @@
-# name: Deploy
+name: Deploy
 
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - yuetsh
 
-# jobs:
-#   deploy-and-run:
-#     runs-on: ubuntu-latest
+permissions:
+  contents: read
 
-#     steps:
-#       - uses: actions/checkout@v4
-
-#       - uses: appleboy/ssh-action@v1.2.1
-#         with:
-#           host: ${{ secrets.HOST }}
-#           username: root
-#           key: ${{ secrets.KEY }}
-#           script: |
-#             cd ~/WebPreview/api
-#             git pull
-#             sh ~/WebPreview/run.sh
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: debian
+            remote_port: 22
+          - name: school
+            remote_port: 8822
+    steps:
+      - name: Deploy to ${{ matrix.name }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ matrix.remote_port }}
+          username: root
+          key: ${{ secrets.KEY }}
+          script: sh /root/WebPreview/backend.sh
