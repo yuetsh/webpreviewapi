@@ -50,6 +50,12 @@ GUIDANCE_SYSTEM_PROMPT = """你是一个提示词写作教练，帮助学生写�
 6. 不要生成任何代码"""
 
 DEFAULT_MODEL = "deepseek-v4-flash"
+DEEPSEEK_THINKING_MODEL = "deepseek-v4-flash-thinking"
+MODEL_ALIASES = {
+    DEEPSEEK_THINKING_MODEL: DEFAULT_MODEL,
+}
+NON_THINKING_MODELS = {"deepseek-v4-flash"}
+NON_THINKING_EXTRA_BODY = {"thinking": {"type": "disabled"}}
 
 # Models served by the ARK (Volcengine) endpoint
 ARK_MODELS = {"doubao-seed-2-0-lite-260215"}
@@ -64,14 +70,16 @@ def build_messages(history: list[dict]) -> list[dict]:
 
 def _get_client(model: str) -> tuple[AsyncOpenAI, str]:
     """Return (client, model_id) for the given model name."""
-    if model in ARK_MODELS:
+    requested_model = model or DEFAULT_MODEL
+    resolved_model = MODEL_ALIASES.get(requested_model, requested_model)
+    if resolved_model in ARK_MODELS:
         return (
             AsyncOpenAI(
                 api_key=settings.ARK_API_KEY,
                 base_url=settings.ARK_BASE_URL,
                 timeout=120.0,
             ),
-            model,
+            resolved_model,
         )
     return (
         AsyncOpenAI(
@@ -79,19 +87,46 @@ def _get_client(model: str) -> tuple[AsyncOpenAI, str]:
             base_url=settings.LLM_BASE_URL,
             timeout=120.0,
         ),
-        model or DEFAULT_MODEL,
+        resolved_model,
     )
+
+
+def _should_disable_thinking(requested_model: str, resolved_model: str) -> bool:
+    return (
+        resolved_model in NON_THINKING_MODELS
+        and requested_model not in MODEL_ALIASES
+    )
+
+
+def _chat_completion_kwargs(
+    requested_model: str,
+    resolved_model: str,
+    messages: list[dict],
+    stream: bool,
+) -> dict:
+    kwargs = {
+        "model": resolved_model,
+        "messages": messages,
+        "stream": stream,
+    }
+    if _should_disable_thinking(requested_model, resolved_model):
+        kwargs["extra_body"] = NON_THINKING_EXTRA_BODY
+    return kwargs
 
 
 async def stream_chat(history: list[dict], model: str = ""):
     """Stream chat completion from the LLM. Yields content chunks."""
     messages = build_messages(history)
     client, resolved_model = _get_client(model)
+    requested_model = model or DEFAULT_MODEL
     async with client as c:
         stream = await c.chat.completions.create(
-            model=resolved_model,
-            messages=messages,
-            stream=True,
+            **_chat_completion_kwargs(
+                requested_model,
+                resolved_model,
+                messages,
+                stream=True,
+            ),
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta
@@ -137,11 +172,15 @@ async def stream_guidance(history: list[dict]):
     messages = [{"role": "system", "content": GUIDANCE_SYSTEM_PROMPT}]
     messages.extend(history)
     client, model = _get_client("")
+    requested_model = DEFAULT_MODEL
     async with client as c:
         stream = await c.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
+            **_chat_completion_kwargs(
+                requested_model,
+                model,
+                messages,
+                stream=True,
+            ),
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta

@@ -1,4 +1,7 @@
 from datetime import timedelta
+from unittest.mock import patch
+
+from asgiref.sync import async_to_sync
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -297,7 +300,117 @@ class PromptHistoryTest(TestCase):
         self.assertIsNone(data[0]["code_js"])
 
 
-from prompt.llm import GUIDANCE_SYSTEM_PROMPT, parse_guidance_response
+from prompt.llm import (
+    DEFAULT_MODEL,
+    GUIDANCE_SYSTEM_PROMPT,
+    parse_guidance_response,
+    stream_chat,
+    stream_guidance,
+)
+
+
+class _FakeDelta:
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content):
+        self.delta = _FakeDelta(content)
+
+
+class _FakeChunk:
+    def __init__(self, content):
+        self.choices = [_FakeChoice(content)]
+
+
+class _FakeStream:
+    def __init__(self, chunks):
+        self._chunks = iter(chunks)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return _FakeChunk(next(self._chunks))
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class _FakeCompletions:
+    def __init__(self):
+        self.kwargs = None
+
+    async def create(self, **kwargs):
+        self.kwargs = kwargs
+        return _FakeStream(["ok"])
+
+
+class _FakeChat:
+    def __init__(self, completions):
+        self.completions = completions
+
+
+class _FakeClient:
+    def __init__(self):
+        self.completions = _FakeCompletions()
+        self.chat = _FakeChat(self.completions)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+async def _collect_stream(stream):
+    return [chunk async for chunk in stream]
+
+
+class DeepSeekThinkingModeTest(TestCase):
+    def test_stream_chat_disables_thinking_for_deepseek_flash(self):
+        client = _FakeClient()
+
+        with patch("prompt.llm._get_client", return_value=(client, DEFAULT_MODEL)):
+            chunks = async_to_sync(_collect_stream)(
+                stream_chat([{"role": "user", "content": "做一个按钮"}])
+            )
+
+        self.assertEqual(chunks, ["ok"])
+        self.assertEqual(
+            client.completions.kwargs["extra_body"],
+            {"thinking": {"type": "disabled"}},
+        )
+
+    def test_stream_guidance_disables_thinking_for_deepseek_flash(self):
+        client = _FakeClient()
+
+        with patch("prompt.llm._get_client", return_value=(client, DEFAULT_MODEL)):
+            chunks = async_to_sync(_collect_stream)(
+                stream_guidance([{"role": "user", "content": "做一个页面"}])
+            )
+
+        self.assertEqual(chunks, ["ok"])
+        self.assertEqual(
+            client.completions.kwargs["extra_body"],
+            {"thinking": {"type": "disabled"}},
+        )
+
+    def test_stream_chat_thinking_option_uses_deepseek_flash_without_disabling_thinking(self):
+        client = _FakeClient()
+
+        with patch("prompt.llm.AsyncOpenAI", return_value=client):
+            chunks = async_to_sync(_collect_stream)(
+                stream_chat(
+                    [{"role": "user", "content": "做一个按钮"}],
+                    model="deepseek-v4-flash-thinking",
+                )
+            )
+
+        self.assertEqual(chunks, ["ok"])
+        self.assertEqual(client.completions.kwargs["model"], DEFAULT_MODEL)
+        self.assertNotIn("extra_body", client.completions.kwargs)
 
 
 class ParseGuidanceResponseTest(TestCase):
