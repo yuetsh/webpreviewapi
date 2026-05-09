@@ -22,6 +22,7 @@ from django.db.models import (
 )
 from account.decorators import admin_required
 from prompt.models import Conversation, Message
+from .classifier import classify_conversation_messages
 
 
 from .schemas import (
@@ -150,8 +151,6 @@ def create_submission(request, payload: SubmissionIn):
             code_js=payload.js,
             source="manual",
         )
-        from .classifier import classify_conversation_messages
-        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
     else:
         conversation = (
             Conversation.objects.filter(user=request.user, task=task)
@@ -159,9 +158,9 @@ def create_submission(request, payload: SubmissionIn):
             .order_by("-msg_count", "-created")
             .first()
         )
-        if conversation:
-            from .classifier import classify_conversation_messages
-            threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
+
+    if conversation:
+        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
 
     submission = Submission.objects.create(
         user=request.user,

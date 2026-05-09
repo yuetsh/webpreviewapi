@@ -47,6 +47,6 @@ class ConversationOut(Schema):
             "task_id": conv.task_id,
             "task_title": conv.task.title,
             "is_active": conv.is_active,
-            "message_count": conv.messages.count(),
+            "message_count": conv.msg_count if hasattr(conv, "msg_count") else conv.messages.count(),
             "created": conv.created.isoformat(),
         }

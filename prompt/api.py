@@ -6,7 +6,7 @@ from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from .models import Conversation, Message
 from .schemas import ConversationOut, MessageOut, PromptHistoryItemOut
 from account.models import RoleChoices
@@ -66,11 +66,13 @@ def list_prompt_history(request, task_id: int):
     conversations = Conversation.objects.filter(
         user=request.user,
         task_id=task_id,
-    ).prefetch_related("messages")
+    ).prefetch_related(
+        Prefetch("messages", queryset=Message.objects.order_by("created", "id"))
+    )
 
     items = []
     for conv in conversations:
-        messages = list(conv.messages.all().order_by("created", "id"))
+        messages = list(conv.messages.all())
         for idx, user_msg in enumerate(messages):
             if user_msg.role != "user":
                 continue

@@ -3,32 +3,32 @@ from django.conf import settings
 from openai import AsyncOpenAI
 
 
-SYSTEM_PROMPT = """你是一个网页生成助手。根据用户的需求描述，生成 HTML、CSS 和 JavaScript 代码。
+SYSTEM_PROMPT = """你是一个网页生成助手。根据用户的需求描述，生成网页代码。
 
 规则：
-1. 始终使用三个独立的代码块返回代码，分别用 ```html、```css、```js 标记
+1. 使用一个 ```html 代码块返回所有代码
 2. HTML 代码只需要 body 内的内容，不需要完整的 HTML 文档结构
-3. CSS 和 JS 可以为空，但仍然需要返回空的代码块
+3. CSS 样式写在 <style> 标签内，JavaScript 写在 <script> 标签内，都放在代码块里
 4. 用中文回复，先简要说明你做了什么，然后给出代码
 5. 在已有代码基础上修改时，返回完整的修改后代码，不要只返回片段
 6. 由于任何外部链接都被屏蔽，使用纯 HTML、CSS 和 JS 实现功能，不要依赖外部库
 
-输出格式示例（必须严格遵守，三个代码块缺一不可）：
+输出格式示例（必须严格遵守，只用一个代码块）：
 
 好的，我为你创建了一个点击按钮变色的示例。
 
 ```html
-<button id="btn">点击我</button>
-```
-
-```css
+<style>
 button { padding: 8px 16px; }
-```
+</style>
 
-```js
+<button id="btn">点击我</button>
+
+<script>
 document.getElementById('btn').onclick = function() {
   this.style.background = 'red';
 };
+</script>
 ```"""
 
 GUIDANCE_SYSTEM_PROMPT = """你是一个提示词写作教练，帮助学生写出清晰、具体的网页需求描述。
@@ -59,13 +59,6 @@ NON_THINKING_EXTRA_BODY = {"thinking": {"type": "disabled"}}
 
 # Models served by the ARK (Volcengine) endpoint
 ARK_MODELS = {"doubao-seed-2-0-lite-260215"}
-
-
-def build_messages(history: list[dict]) -> list[dict]:
-    """Build the message list for the LLM API call."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(history)
-    return messages
 
 
 def _get_client(model: str) -> tuple[AsyncOpenAI, str]:
@@ -114,19 +107,12 @@ def _chat_completion_kwargs(
     return kwargs
 
 
-async def stream_chat(history: list[dict], model: str = ""):
-    """Stream chat completion from the LLM. Yields content chunks."""
-    messages = build_messages(history)
+async def _stream_completion(messages: list[dict], model: str = ""):
     client, resolved_model = _get_client(model)
     requested_model = model or DEFAULT_MODEL
     async with client as c:
         stream = await c.chat.completions.create(
-            **_chat_completion_kwargs(
-                requested_model,
-                resolved_model,
-                messages,
-                stream=True,
-            ),
+            **_chat_completion_kwargs(requested_model, resolved_model, messages, stream=True),
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta
@@ -134,8 +120,15 @@ async def stream_chat(history: list[dict], model: str = ""):
                 yield delta.content
 
 
+async def stream_chat(history: list[dict], model: str = ""):
+    """Stream chat completion from the LLM. Yields content chunks."""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
+    async for chunk in _stream_completion(messages, model):
+        yield chunk
+
+
 def extract_code(text: str) -> dict:
-    """Extract HTML, CSS, JS code blocks from AI response text."""
+    """Extract code from AI response. Supports single HTML block (new) or separate html/css/js blocks (legacy)."""
     result = {"html": None, "css": None, "js": None}
     pattern = r"```(html|css|js|javascript|typescript|ts|jsx|tsx)\s*\n(.*?)```"
     matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
@@ -146,17 +139,21 @@ def extract_code(text: str) -> dict:
         if lang in result and result[lang] is None:
             result[lang] = code.strip()
 
-    # Fallback: extract <style> and <script> from HTML block
-    if result["html"]:
-        if result["css"] is None:
-            style_match = re.search(r"<style[^>]*>(.*?)</style>", result["html"], re.DOTALL | re.IGNORECASE)
-            if style_match:
-                result["css"] = style_match.group(1).strip()
+    # Single HTML block: extract <style>/<script> contents and strip them from html
+    if result["html"] and result["css"] is None and result["js"] is None:
+        html = result["html"]
 
-        if result["js"] is None:
-            script_match = re.search(r"<script[^>]*>(.*?)</script>", result["html"], re.DOTALL | re.IGNORECASE)
-            if script_match:
-                result["js"] = script_match.group(1).strip()
+        style_match = re.search(r"<style[^>]*>(.*?)</style>", html, re.DOTALL | re.IGNORECASE)
+        if style_match:
+            result["css"] = style_match.group(1).strip()
+            html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL | re.IGNORECASE)
+
+        script_match = re.search(r"<script[^>]*>(.*?)</script>", html, re.DOTALL | re.IGNORECASE)
+        if script_match:
+            result["js"] = script_match.group(1).strip()
+            html = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+
+        result["html"] = html.strip()
 
     return result
 
@@ -169,20 +166,6 @@ def parse_guidance_response(full_response: str) -> tuple[str, bool]:
 
 async def stream_guidance(history: list[dict]):
     """Stream guidance coaching response. Yields content chunks."""
-    messages = [{"role": "system", "content": GUIDANCE_SYSTEM_PROMPT}]
-    messages.extend(history)
-    client, model = _get_client("")
-    requested_model = DEFAULT_MODEL
-    async with client as c:
-        stream = await c.chat.completions.create(
-            **_chat_completion_kwargs(
-                requested_model,
-                model,
-                messages,
-                stream=True,
-            ),
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta
-            if delta.content:
-                yield delta.content
+    messages = [{"role": "system", "content": GUIDANCE_SYSTEM_PROMPT}, *history]
+    async for chunk in _stream_completion(messages):
+        yield chunk
