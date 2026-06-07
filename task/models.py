@@ -19,6 +19,9 @@ class Task(TimeStampedModel):
         verbose_name="类型",
     )
     is_public = models.BooleanField(default=False, verbose_name="是否公开")
+    example_html = models.TextField(null=True, blank=True, verbose_name="示例HTML")
+    example_css = models.TextField(null=True, blank=True, verbose_name="示例CSS")
+    example_js = models.TextField(null=True, blank=True, verbose_name="示例JS")
 
     class Meta:
         unique_together = ("display", "task_type")

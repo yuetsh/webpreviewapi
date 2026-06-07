@@ -20,6 +20,9 @@ class TutorialIn(Schema):
     title: str
     content: str
     is_public: bool = False
+    example_html: Optional[str] = None
+    example_css: Optional[str] = None
+    example_js: Optional[str] = None
 
 
 class ChallengeSlim(Schema):
@@ -49,3 +52,6 @@ class ChallengeIn(Schema):
     content: str
     score: int = 0
     is_public: bool = False
+    example_html: Optional[str] = None
+    example_css: Optional[str] = None
+    example_js: Optional[str] = None

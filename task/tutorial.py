@@ -38,6 +38,9 @@ def create_or_update(request, payload: TutorialIn):
         item.title = payload.title
         item.content = payload.content
         item.is_public = payload.is_public
+        item.example_html = payload.example_html
+        item.example_css = payload.example_css
+        item.example_js = payload.example_js
         item.save()
         return {"message": "更新成功"}
     except Tutorial.DoesNotExist:

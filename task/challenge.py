@@ -68,6 +68,9 @@ def create_or_update(request, payload: ChallengeIn):
         item.content = payload.content
         item.score = payload.score
         item.is_public = payload.is_public
+        item.example_html = payload.example_html
+        item.example_css = payload.example_css
+        item.example_js = payload.example_js
         if item.author_id is None and request.user.is_authenticated:
             item.author = request.user
         item.save()
