@@ -205,6 +205,7 @@ class SubmissionAward(TimeStampedModel):
     awarded_at = models.DateTimeField(
         auto_now_add=True, db_index=True, verbose_name="授奖时间"
     )
+    is_stale = models.BooleanField(default=False, verbose_name="有更新提交")
 
     class Meta:
         unique_together = ("submission", "award")

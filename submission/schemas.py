@@ -271,6 +271,7 @@ class AwardItemManageOut(Schema):
     sort_order: int
     awarded_at: datetime
     has_prompt_chain: bool
+    is_stale: bool = False
 
 
 class ShowcaseDetailOut(Schema):

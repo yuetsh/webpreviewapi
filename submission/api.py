@@ -104,6 +104,7 @@ def _award_item_manage_out(item: SubmissionAward):
         "sort_order": item.sort_order,
         "awarded_at": item.awarded_at,
         "has_prompt_chain": has_prompt_chain,
+        "is_stale": item.is_stale,
     }
 
 
@@ -186,6 +187,13 @@ def create_submission(request, payload: SubmissionIn):
             msg.save(update_fields=["submission"])
         except Message.DoesNotExist:
             pass  # invalid message_id — submission already created, silently skip
+
+    # Mark any showcased older submissions from same user+task as stale
+    SubmissionAward.objects.filter(
+        submission__user=request.user,
+        submission__task=task,
+        is_stale=False,
+    ).exclude(submission=submission).update(is_stale=True)
 
     return {"id": str(submission.id)}
 
@@ -703,6 +711,31 @@ def delete_manage_award_item(request, item_id: int):
     item = get_object_or_404(SubmissionAward, id=item_id)
     item.delete()
     return {"message": "删除成功"}
+
+
+@router.put("/showcase/manage/items/{item_id}/refresh", response=AwardItemManageOut)
+@admin_required
+def refresh_manage_award_item(request, item_id: int):
+    """切换创意工坊条目到该学生该挑战的最新提交"""
+    item = get_object_or_404(
+        SubmissionAward.objects.select_related(
+            "submission", "submission__user", "submission__task"
+        ),
+        id=item_id,
+    )
+    latest = (
+        Submission.objects.filter(
+            user=item.submission.user,
+            task=item.submission.task,
+        )
+        .order_by("-created")
+        .first()
+    )
+    if latest and latest.pk != item.submission_id:
+        item.submission = latest
+    item.is_stale = False
+    item.save(update_fields=["submission", "is_stale"])
+    return _award_item_manage_out(item)
 
 
 @router.get("/showcase/{submission_id}/", response=ShowcaseDetailOut)
