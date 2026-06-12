@@ -117,6 +117,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
                     "css": m.code_css,
                     "js": m.code_js,
                 } if m.role == "assistant" else None,
+                "submitted": m.submission_id is not None if m.role == "assistant" else None,
                 "created": m.created.isoformat(),
             }
             for m in messages
