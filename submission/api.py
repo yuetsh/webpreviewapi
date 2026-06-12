@@ -1,4 +1,5 @@
 import csv
+import logging
 import threading
 from typing import List, Literal, Optional
 from urllib.parse import quote
@@ -23,7 +24,8 @@ from django.db.models import (
 from django.utils import timezone
 from account.decorators import admin_required, super_required
 from prompt.models import Conversation, Message
-from .classifier import classify_conversation_messages
+from prompt.utils import get_active_conversation, get_preceding_user_message
+from .classifier import classify_message
 
 
 from .schemas import (
@@ -58,6 +60,7 @@ from task.models import Task
 from account.models import RoleChoices, User
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 def _validate_item_ordering(value: str):
@@ -131,20 +134,19 @@ def create_submission(request, payload: SubmissionIn):
     task = get_object_or_404(Task, id=payload.task_id)
 
     manual_asst_msg = None
+    linked_msg = None
+    new_user_msg_id = None
+
     if payload.prompt:
-        conversation = (
-            Conversation.objects.filter(user=request.user, task=task)
-            .annotate(msg_count=Count("messages"))
-            .order_by("-msg_count", "-created")
-            .first()
-        )
+        conversation = get_active_conversation(request.user, task.id)
         if not conversation:
             conversation = Conversation.objects.create(
                 user=request.user, task=task, is_active=False
             )
-        Message.objects.create(
+        user_msg = Message.objects.create(
             conversation=conversation, role="user", content=payload.prompt, source="manual"
         )
+        new_user_msg_id = user_msg.id
         manual_asst_msg = Message.objects.create(
             conversation=conversation,
             role="assistant",
@@ -154,48 +156,60 @@ def create_submission(request, payload: SubmissionIn):
             code_js=payload.js,
             source="manual",
         )
+    elif payload.message_id:
+        linked_msg = Message.objects.filter(
+            id=payload.message_id,
+            role="assistant",
+            conversation__user=request.user,
+            conversation__task=task,
+        ).first()
+        if linked_msg is None:
+            logger.warning(
+                "create_submission: message_id %s not found for user %s task %s",
+                payload.message_id, request.user.id, task.id,
+            )
+        else:
+            user_msg = get_preceding_user_message(linked_msg)
+            if user_msg:
+                new_user_msg_id = user_msg.id
+
+    # Idempotent: re-submitting the same AI message updates its existing submission
+    # instead of creating an orphaned duplicate.
+    if linked_msg and linked_msg.submission_id:
+        submission = linked_msg.submission
+        submission.html = payload.html
+        submission.css = payload.css
+        submission.js = payload.js
+        submission.save(update_fields=["html", "css", "js"])
     else:
-        conversation = (
-            Conversation.objects.filter(user=request.user, task=task)
-            .annotate(msg_count=Count("messages"))
-            .order_by("-msg_count", "-created")
-            .first()
+        submission = Submission.objects.create(
+            user=request.user,
+            task=task,
+            html=payload.html,
+            css=payload.css,
+            js=payload.js,
         )
 
-    if conversation:
-        threading.Thread(target=classify_conversation_messages, args=(conversation.id,), daemon=True).start()
+        # Link assistant message to submission
+        if manual_asst_msg:
+            manual_asst_msg.submission = submission
+            manual_asst_msg.save(update_fields=["submission"])
+        elif linked_msg:
+            linked_msg.submission = submission
+            linked_msg.save(update_fields=["submission"])
 
-    submission = Submission.objects.create(
-        user=request.user,
-        task=task,
-        html=payload.html,
-        css=payload.css,
-        js=payload.js,
-    )
+        # Mark any showcased older submissions from same user+task as stale
+        SubmissionAward.objects.filter(
+            submission__user=request.user,
+            submission__task=task,
+            is_stale=False,
+        ).exclude(submission=submission).update(is_stale=True)
 
-    # Link assistant message to submission
-    if manual_asst_msg:
-        manual_asst_msg.submission = submission
-        manual_asst_msg.save(update_fields=["submission"])
-    elif payload.message_id:
-        try:
-            msg = Message.objects.get(
-                id=payload.message_id,
-                role="assistant",
-                conversation__user=request.user,
-                conversation__task=task,
-            )
-            msg.submission = submission
-            msg.save(update_fields=["submission"])
-        except Message.DoesNotExist:
-            pass  # invalid message_id — submission already created, silently skip
-
-    # Mark any showcased older submissions from same user+task as stale
-    SubmissionAward.objects.filter(
-        submission__user=request.user,
-        submission__task=task,
-        is_stale=False,
-    ).exclude(submission=submission).update(is_stale=True)
+    # Classify only the newly-added prompt message, and only if not already classified
+    if new_user_msg_id is not None and not Message.objects.filter(
+        id=new_user_msg_id, prompt_level__isnull=False
+    ).exists():
+        threading.Thread(target=classify_message, args=(new_user_msg_id,), daemon=True).start()
 
     return {"id": str(submission.id)}
 
@@ -341,19 +355,15 @@ def delete_submission(request, submission_id: UUID):
     if submission.user != request.user and request.user.role != RoleChoices.SUPER:
         raise HttpError(403, "只能删除自己的提交")
 
+    if request.user.role != RoleChoices.SUPER:
+        has_ratings = Rating.objects.filter(submission=submission).exists()
+        has_awards = SubmissionAward.objects.filter(submission=submission).exists()
+        if has_ratings or has_awards:
+            raise HttpError(400, "该提交已被评分或获奖，无法删除")
+
     # 找到关联的助手消息，再找前一条用户消息
     asst_msg = Message.objects.filter(submission=submission).first()
-    user_msg = None
-    if asst_msg:
-        user_msg = (
-            Message.objects.filter(
-                conversation=asst_msg.conversation,
-                created__lt=asst_msg.created,
-                role="user",
-            )
-            .order_by("-created")
-            .first()
-        )
+    user_msg = get_preceding_user_message(asst_msg) if asst_msg else None
 
     submission.delete()  # CASCADE 自动删除关联的 asst_msg
 

@@ -1,8 +1,8 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.db.models import Count
-from .models import Conversation, Message
+from .models import Message
+from .utils import get_or_create_active_conversation
 from .llm import stream_chat, extract_code, stream_guidance, parse_guidance_response
 
 
@@ -79,15 +79,7 @@ class PromptConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_or_create_conversation(self):
-        conv = (
-            Conversation.objects.filter(user=self.user, task_id=self.task_id)
-            .annotate(msg_count=Count("messages"))
-            .order_by("-msg_count", "-created")
-            .first()
-        )
-        if not conv:
-            conv = Conversation.objects.create(user=self.user, task_id=self.task_id)
-        return conv
+        return get_or_create_active_conversation(self.user, self.task_id)
 
     @database_sync_to_async
     def delete_message(self, message):
@@ -195,15 +187,7 @@ class GuidanceConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_or_create_conversation(self):
-        conv = (
-            Conversation.objects.filter(user=self.user, task_id=self.task_id)
-            .annotate(msg_count=Count("messages"))
-            .order_by("-msg_count", "-created")
-            .first()
-        )
-        if not conv:
-            conv = Conversation.objects.create(user=self.user, task_id=self.task_id)
-        return conv
+        return get_or_create_active_conversation(self.user, self.task_id)
 
     @database_sync_to_async
     def delete_message(self, message):

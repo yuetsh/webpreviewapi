@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 
 from django.db.models import Count, Prefetch
 from .models import Conversation, Message
+from .utils import get_preceding_user_message
 from .schemas import ConversationOut, MessageOut, PromptHistoryItemOut
 from account.models import RoleChoices
 
@@ -166,16 +167,15 @@ def delete_message_pair(request, message_id: int):
     if asst_msg.conversation.user != request.user and request.user.role != RoleChoices.SUPER:
         raise HttpError(403, "只能删除自己的消息")
 
+    if asst_msg.submission_id and request.user.role != RoleChoices.SUPER:
+        from submission.models import Rating, SubmissionAward
+        has_ratings = Rating.objects.filter(submission_id=asst_msg.submission_id).exists()
+        has_awards = SubmissionAward.objects.filter(submission_id=asst_msg.submission_id).exists()
+        if has_ratings or has_awards:
+            raise HttpError(400, "该消息关联的提交已被评分或获奖，无法删除")
+
     # Find the preceding user message
-    user_msg = (
-        Message.objects.filter(
-            conversation=asst_msg.conversation,
-            created__lt=asst_msg.created,
-            role="user",
-        )
-        .order_by("-created")
-        .first()
-    )
+    user_msg = get_preceding_user_message(asst_msg)
 
     # Delete messages first, then submission
     submission_id = asst_msg.submission_id  # capture before deletion nulls it
@@ -187,10 +187,7 @@ def delete_message_pair(request, message_id: int):
     submission_deleted = False
     if submission_id:
         from submission.models import Submission as SubmissionModel
-        try:
-            SubmissionModel.objects.filter(id=submission_id).delete()
-            submission_deleted = True
-        except Exception:
-            pass
+        SubmissionModel.objects.filter(id=submission_id).delete()
+        submission_deleted = True
 
     return {"deleted": True, "submission_deleted": submission_deleted}
