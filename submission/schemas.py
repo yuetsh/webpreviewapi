@@ -296,3 +296,34 @@ class PromptRoundOut(Schema):
     html: Optional[str] = None
     css: Optional[str] = None
     js: Optional[str] = None
+
+
+class RandomRatingOut(Schema):
+    submission_id: UUID
+    username: str
+    task_title: str
+    task_display: int
+    task_type: Literal["tutorial", "challenge"]
+    html: Optional[str] = None
+    css: Optional[str] = None
+    js: Optional[str] = None
+
+    @staticmethod
+    def resolve_submission_id(obj):
+        return obj.id
+
+    @staticmethod
+    def resolve_username(obj):
+        return obj.user.username
+
+    @staticmethod
+    def resolve_task_title(obj):
+        return obj.task.title
+
+    @staticmethod
+    def resolve_task_display(obj):
+        return obj.task.display
+
+    @staticmethod
+    def resolve_task_type(obj):
+        return obj.task.task_type

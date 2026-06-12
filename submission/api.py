@@ -20,6 +20,7 @@ from django.db.models import (
     Q,
     Subquery,
 )
+from django.utils import timezone
 from account.decorators import admin_required
 from prompt.models import Conversation, Message
 from .classifier import classify_conversation_messages
@@ -44,6 +45,7 @@ from .schemas import (
     SubmissionIn,
     SubmissionOut,
     RatingScoreIn,
+    RandomRatingOut,
     TaskStatsOut,
     TopViewedItem,
     UserTag,
@@ -286,6 +288,37 @@ def list_by_user_task(request, user_id: int, task_id: int):
         .annotate(my_score=user_rating_subquery)
         .order_by("-created")
     )
+
+
+@router.get("/random-for-rating/", response=Optional[RandomRatingOut])
+@login_required
+def get_random_for_rating(request, exclude_id: Optional[UUID] = None):
+    """
+    随机返回一个待打分的其他同学的提交（用于AI生成期间的随手打分弹窗）
+    """
+    if request.user.role == RoleChoices.NORMAL:
+        today_start = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        today_end = today_start + timezone.timedelta(days=1)
+        rating_count = Rating.objects.filter(
+            user=request.user, created__range=(today_start, today_end)
+        ).count()
+        if rating_count >= 30:
+            return None
+
+    candidates = (
+        Submission.objects.select_related("task", "user")
+        .exclude(user=request.user)
+        .exclude(ratings__user=request.user)
+    )
+    if exclude_id:
+        candidates = candidates.exclude(pk=exclude_id)
+
+    pending = candidates.annotate(rating_count=Count("ratings")).filter(
+        rating_count__lt=5
+    )
+    return pending.order_by("?").first() or candidates.order_by("?").first()
 
 
 @router.delete("/flags")

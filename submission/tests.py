@@ -10,7 +10,7 @@ from account.models import RoleChoices
 from prompt.models import Conversation, Message
 from task.models import Task
 
-from .models import Award, Submission, SubmissionAward
+from .models import Award, Rating, Submission, SubmissionAward
 
 User = get_user_model()
 
@@ -533,3 +533,72 @@ class GradebookApiTest(TestCase):
         self.assertEqual(rows[1][2], "alice")
         self.assertEqual(rows[1][4], "4")
         self.assertEqual(rows[1][7], "4")
+
+
+class RandomForRatingApiTest(TestCase):
+    def setUp(self):
+        self.viewer = _make_user("viewer")
+        self.author = _make_user("author")
+        self.task = _make_task()
+
+    def _submission(self, user, html="<div>work</div>"):
+        return Submission.objects.create(
+            user=user, task=self.task, html=html, css="", js=""
+        )
+
+    def test_excludes_own_and_already_rated_submissions(self):
+        self._submission(self.viewer)  # 自己的提交，应排除
+        rated = self._submission(self.author)
+        Rating.objects.create(user=self.viewer, submission=rated, score=4)
+        eligible = self._submission(self.author)
+
+        self.client.force_login(self.viewer)
+        resp = self.client.get("/api/submission/random-for-rating/")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIsNotNone(data)
+        self.assertEqual(data["submission_id"], str(eligible.id))
+        self.assertEqual(data["username"], "author")
+        self.assertEqual(data["task_title"], self.task.title)
+        self.assertEqual(data["task_display"], self.task.display)
+        self.assertEqual(data["task_type"], "challenge")
+
+    def test_prefers_submission_with_fewer_than_five_ratings(self):
+        raters = [_make_user(f"rater{i}") for i in range(5)]
+        many_ratings = self._submission(self.author, html="<div>many</div>")
+        for rater in raters:
+            Rating.objects.create(user=rater, submission=many_ratings, score=3)
+        few_ratings = self._submission(self.author, html="<div>few</div>")
+        for rater in raters[:2]:
+            Rating.objects.create(user=rater, submission=few_ratings, score=3)
+
+        self.client.force_login(self.viewer)
+        resp = self.client.get("/api/submission/random-for-rating/")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["submission_id"], str(few_ratings.id))
+
+    def test_exclude_id_param_excludes_given_submission(self):
+        only = self._submission(self.author)
+
+        self.client.force_login(self.viewer)
+        resp = self.client.get(
+            f"/api/submission/random-for-rating/?exclude_id={only.id}"
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json())
+
+    def test_normal_user_reaching_daily_cap_returns_none(self):
+        self._submission(self.author, html="<div>extra</div>")
+        for i in range(30):
+            target = self._submission(self.author, html=f"<div>{i}</div>")
+            Rating.objects.create(user=self.viewer, submission=target, score=3)
+
+        self.client.force_login(self.viewer)
+        resp = self.client.get("/api/submission/random-for-rating/")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json())
