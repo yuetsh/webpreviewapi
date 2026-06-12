@@ -268,6 +268,7 @@ class ShowcaseManagementApiTest(TestCase):
 
 class GradebookApiTest(TestCase):
     def setUp(self):
+        self.super = _make_user("grade-super", role=RoleChoices.SUPER)
         self.admin = _make_user("grade-admin", role=RoleChoices.ADMIN)
         self.normal = _make_user("grade-normal", classname="blocked")
 
@@ -289,7 +290,7 @@ class GradebookApiTest(TestCase):
         return submission
 
     def test_gradebook_requires_classname(self):
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/")
 
@@ -306,6 +307,34 @@ class GradebookApiTest(TestCase):
 
         self.assertIn(resp.status_code, (302, 403))
         self.assertIn(export_resp.status_code, (302, 403))
+
+    def test_admin_user_cannot_access_gradebook(self):
+        self.client.force_login(self.admin)
+
+        resp = self.client.get("/api/submission/gradebook/?classname=10A")
+        export_resp = self.client.get(
+            "/api/submission/gradebook/export/?classname=10A"
+        )
+
+        self.assertIn(resp.status_code, (302, 403))
+        self.assertIn(export_resp.status_code, (302, 403))
+
+    def test_admin_user_is_counted_in_class_gradebook(self):
+        self._student("alice")
+        admin_in_class = _make_user(
+            "grade-admin-2", role=RoleChoices.ADMIN, classname="10A"
+        )
+        task = _make_task(title="Admin Visible", task_type="challenge", display=9)
+        self._submit(admin_in_class, task, 5.0)
+        self.client.force_login(self.super)
+
+        resp = self.client.get("/api/submission/gradebook/?classname=10A")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["student_count"], 2)
+        usernames = [row["username"] for row in data["rows"]]
+        self.assertIn("grade-admin-2", usernames)
 
     def test_coverage_includes_tutorial_and_challenge_without_public_requirement(self):
         students = [
@@ -337,7 +366,7 @@ class GradebookApiTest(TestCase):
         self._submit(students[0], challenge, 3.0)
         self._submit(students[1], challenge, 4.0)
         self._submit(students[0], low_coverage, 5.0)
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/?classname=10A")
 
@@ -390,7 +419,7 @@ class GradebookApiTest(TestCase):
         old_best = self._submit(alice, task, 4.5, created=older)
         new_best = self._submit(alice, task, 4.5, created=newer)
         self._submit(bob, task, 3.0)
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/?classname=10A")
 
@@ -412,7 +441,7 @@ class GradebookApiTest(TestCase):
         self._submit(bob, tutorial, 5.0)
         self._submit(alice, challenge, 5.0)
         self._submit(bob, challenge, 1.0)
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get(
             "/api/submission/gradebook/?classname=10A&task_type=tutorial&username=alice"
@@ -427,7 +456,7 @@ class GradebookApiTest(TestCase):
 
     def test_missing_class_returns_empty_table_with_class_options(self):
         self._student("alice")
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/?classname=missing")
 
@@ -447,7 +476,7 @@ class GradebookApiTest(TestCase):
         ]
         optional = _make_task(title="Low Coverage", task_type="challenge", display=8)
         self._submit(students[0], optional, 5.0)
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/?classname=10A")
 
@@ -481,7 +510,7 @@ class GradebookApiTest(TestCase):
         for i in range(1, 21):
             student = self._student(f"s{i:02d}", classname="10B")
             self._submit(student, task, float(21 - i))
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get("/api/submission/gradebook/?classname=10B")
 
@@ -504,7 +533,7 @@ class GradebookApiTest(TestCase):
         self._submit(alice, tutorial, 4.0)
         self._submit(bob, tutorial, 2.0)
         self._submit(alice, challenge, 5.0)
-        self.client.force_login(self.admin)
+        self.client.force_login(self.super)
 
         resp = self.client.get(
             "/api/submission/gradebook/export/?classname=10A&task_type=tutorial"

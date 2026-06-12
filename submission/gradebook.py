@@ -60,7 +60,7 @@ def _csv_number(value):
 
 def _classes():
     return list(
-        User.objects.filter(role=RoleChoices.NORMAL)
+        User.objects.filter(role__in=(RoleChoices.NORMAL, RoleChoices.ADMIN))
         .exclude(classname="")
         .values_list("classname", flat=True)
         .distinct()
@@ -81,7 +81,9 @@ def build_gradebook(filters: GradebookFilters):
 
     classes = _classes()
     class_students = list(
-        User.objects.filter(role=RoleChoices.NORMAL, classname=classname)
+        User.objects.filter(
+            role__in=(RoleChoices.NORMAL, RoleChoices.ADMIN), classname=classname
+        )
         .order_by("username", "id")
         .only("id", "username", "classname")
     )

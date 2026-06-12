@@ -21,7 +21,7 @@ from django.db.models import (
     Subquery,
 )
 from django.utils import timezone
-from account.decorators import admin_required
+from account.decorators import admin_required, super_required
 from prompt.models import Conversation, Message
 from .classifier import classify_conversation_messages
 
@@ -517,7 +517,7 @@ def get_task_stats(request, task_id: int, classname: Optional[str] = None):
 
 
 @router.get("/gradebook/", response=GradebookOut)
-@admin_required
+@super_required
 def get_gradebook(
     request,
     classname: str = "",
@@ -536,7 +536,7 @@ def get_gradebook(
 
 
 @router.get("/gradebook/export/")
-@admin_required
+@super_required
 def export_gradebook(
     request,
     classname: str = "",
