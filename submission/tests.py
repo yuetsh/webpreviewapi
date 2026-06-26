@@ -548,6 +548,7 @@ class GradebookApiTest(TestCase):
             [
                 "排名",
                 "等级",
+                "考核等级",
                 "用户名",
                 "班级",
                 "教程1-Intro",
@@ -559,9 +560,9 @@ class GradebookApiTest(TestCase):
                 "未提交任务数",
             ],
         )
-        self.assertEqual(rows[1][2], "alice")
-        self.assertEqual(rows[1][4], "4")
-        self.assertEqual(rows[1][7], "4")
+        self.assertEqual(rows[1][3], "alice")
+        self.assertEqual(rows[1][5], "4")
+        self.assertEqual(rows[1][8], "4")
 
 
 class RandomForRatingApiTest(TestCase):

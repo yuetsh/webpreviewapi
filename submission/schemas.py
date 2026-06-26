@@ -182,6 +182,8 @@ class GradebookRow(Schema):
     classname: str
     rank: int
     grade: Literal["A", "B", "C", "D", "E"]
+    assessment_grade: Literal["A", "B", "C", "D", "E"]
+    best_submission_score: float
     scores: dict[int, GradebookCell]
     tutorial_total: float
     challenge_total: float

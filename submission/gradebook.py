@@ -40,6 +40,19 @@ def _grade_for_rank(rank: int, student_count: int) -> str:
     return "E"
 
 
+def _assessment_grade_for_rank(rank: int, student_count: int) -> str:
+    # 考核等级：A10% B20% C40% D20% E10%，按单题最高分排名
+    if rank <= ceil(0.10 * student_count):
+        return "A"
+    if rank <= ceil(0.30 * student_count):
+        return "B"
+    if rank <= ceil(0.70 * student_count):
+        return "C"
+    if rank <= ceil(0.90 * student_count):
+        return "D"
+    return "E"
+
+
 def _task_sort_key(task):
     type_order = 0 if task.task_type == TaskTypeChoices.TUTORIAL else 1
     return (type_order, task.display, task.id)
@@ -152,6 +165,7 @@ def build_gradebook(filters: GradebookFilters):
         scores = {}
         tutorial_total = 0.0
         challenge_total = 0.0
+        best_submission_score = 0.0
         submitted_task_count = 0
         missing_task_count = 0
 
@@ -176,6 +190,8 @@ def build_gradebook(filters: GradebookFilters):
                 continue
             if submission:
                 submitted_task_count += 1
+                if cell_score > best_submission_score:
+                    best_submission_score = cell_score
             else:
                 missing_task_count += 1
             if task["task_type"] == TaskTypeChoices.TUTORIAL:
@@ -196,6 +212,8 @@ def build_gradebook(filters: GradebookFilters):
                 "classname": student.classname,
                 "rank": 0,
                 "grade": "E",
+                "assessment_grade": "E",
+                "best_submission_score": _score(best_submission_score),
                 "scores": scores,
                 "tutorial_total": tutorial_total,
                 "challenge_total": challenge_total,
@@ -210,6 +228,13 @@ def build_gradebook(filters: GradebookFilters):
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
         row["grade"] = _grade_for_rank(index, student_count)
+
+    # 考核等级：按单题最高分单独排名后定级（不改变上面的总分排名）
+    assessment_order = sorted(
+        rows, key=lambda row: (-row["best_submission_score"], row["username"])
+    )
+    for index, row in enumerate(assessment_order, start=1):
+        row["assessment_grade"] = _assessment_grade_for_rank(index, student_count)
 
     username = filters.username.strip().lower() if filters.username else ""
     if username:
@@ -232,6 +257,7 @@ def gradebook_csv_rows(gradebook):
     yield [
         "排名",
         "等级",
+        "考核等级",
         "用户名",
         "班级",
         *[_task_csv_header(task) for task in tasks],
@@ -247,6 +273,7 @@ def gradebook_csv_rows(gradebook):
         yield [
             row["rank"],
             row["grade"],
+            row["assessment_grade"],
             row["username"],
             row["classname"],
             *[_csv_number(row["scores"][task["id"]]["score"]) for task in tasks],
