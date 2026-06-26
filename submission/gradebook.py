@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from math import ceil
 from typing import Literal
@@ -51,6 +52,24 @@ def _assessment_grade_for_rank(rank: int, student_count: int) -> str:
     if rank <= ceil(0.90 * student_count):
         return "D"
     return "E"
+
+
+# 考核分数：各等级对应的分数段（高分→低分），段内按名次线性铺开
+ASSESSMENT_SCORE_BANDS = {
+    "A": (92, 100),
+    "B": (84, 91),
+    "C": (76, 83),
+    "D": (68, 75),
+    "E": (60, 67),
+}
+
+
+def _assessment_score(index_in_grade: int, grade_size: int, grade: str) -> int:
+    low, high = ASSESSMENT_SCORE_BANDS[grade]
+    if grade_size <= 1:
+        return high
+    # index_in_grade 从 0 开始：段内第 1 名拿段顶，最后 1 名拿段底
+    return round(high - (index_in_grade / (grade_size - 1)) * (high - low))
 
 
 def _task_sort_key(task):
@@ -213,6 +232,7 @@ def build_gradebook(filters: GradebookFilters):
                 "rank": 0,
                 "grade": "E",
                 "assessment_grade": "E",
+                "assessment_score": 60,
                 "best_submission_score": _score(best_submission_score),
                 "scores": scores,
                 "tutorial_total": tutorial_total,
@@ -236,6 +256,17 @@ def build_gradebook(filters: GradebookFilters):
     for index, row in enumerate(assessment_order, start=1):
         row["assessment_grade"] = _assessment_grade_for_rank(index, student_count)
 
+    # 考核分数：在各等级段内按名次（沿用单题最高分排序）线性铺开到对应分数段
+    grade_groups = defaultdict(list)
+    for row in assessment_order:
+        grade_groups[row["assessment_grade"]].append(row)
+    for grade, group in grade_groups.items():
+        grade_size = len(group)
+        for index_in_grade, row in enumerate(group):
+            row["assessment_score"] = _assessment_score(
+                index_in_grade, grade_size, grade
+            )
+
     username = filters.username.strip().lower() if filters.username else ""
     if username:
         rows = [row for row in rows if username in row["username"].lower()]
@@ -258,6 +289,7 @@ def gradebook_csv_rows(gradebook):
         "排名",
         "等级",
         "考核等级",
+        "考核分数",
         "用户名",
         "班级",
         *[_task_csv_header(task) for task in tasks],
@@ -274,6 +306,7 @@ def gradebook_csv_rows(gradebook):
             row["rank"],
             row["grade"],
             row["assessment_grade"],
+            row["assessment_score"],
             row["username"],
             row["classname"],
             *[_csv_number(row["scores"][task["id"]]["score"]) for task in tasks],
