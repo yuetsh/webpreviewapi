@@ -42,7 +42,7 @@ def _grade_for_rank(rank: int, student_count: int) -> str:
 
 
 def _assessment_grade_for_rank(rank: int, student_count: int) -> str:
-    # 考核等级：A10% B20% C40% D20% E10%，按单题最高分排名
+    # 考核等级：A10% B20% C40% D20% E10%，按最高三次提交均分排名
     if rank <= ceil(0.10 * student_count):
         return "A"
     if rank <= ceil(0.30 * student_count):
@@ -55,8 +55,9 @@ def _assessment_grade_for_rank(rank: int, student_count: int) -> str:
 
 
 # 考核分数：各等级对应的分数段（高分→低分），段内按名次线性铺开
+# 最高分封顶 99，不出现满分 100
 ASSESSMENT_SCORE_BANDS = {
-    "A": (92, 100),
+    "A": (92, 99),
     "B": (84, 91),
     "C": (76, 83),
     "D": (68, 75),
@@ -184,7 +185,7 @@ def build_gradebook(filters: GradebookFilters):
         scores = {}
         tutorial_total = 0.0
         challenge_total = 0.0
-        best_submission_score = 0.0
+        submitted_scores = []
         submitted_task_count = 0
         missing_task_count = 0
 
@@ -209,8 +210,7 @@ def build_gradebook(filters: GradebookFilters):
                 continue
             if submission:
                 submitted_task_count += 1
-                if cell_score > best_submission_score:
-                    best_submission_score = cell_score
+                submitted_scores.append(cell_score)
             else:
                 missing_task_count += 1
             if task["task_type"] == TaskTypeChoices.TUTORIAL:
@@ -220,6 +220,8 @@ def build_gradebook(filters: GradebookFilters):
 
         tutorial_total = _score(tutorial_total)
         challenge_total = _score(challenge_total)
+        top3 = sorted(submitted_scores, reverse=True)[:3]
+        top3_score = _score(sum(top3) / len(top3)) if top3 else 0.0
         total_score = _score(tutorial_total + challenge_total)
         average_score = (
             _score(total_score / len(included_task_ids)) if included_task_ids else None
@@ -233,7 +235,7 @@ def build_gradebook(filters: GradebookFilters):
                 "grade": "E",
                 "assessment_grade": "E",
                 "assessment_score": 60,
-                "best_submission_score": _score(best_submission_score),
+                "top3_score": top3_score,
                 "scores": scores,
                 "tutorial_total": tutorial_total,
                 "challenge_total": challenge_total,
@@ -249,14 +251,14 @@ def build_gradebook(filters: GradebookFilters):
         row["rank"] = index
         row["grade"] = _grade_for_rank(index, student_count)
 
-    # 考核等级：按单题最高分单独排名后定级（不改变上面的总分排名）
+    # 考核等级：按最高三次提交均分单独排名后定级（不改变上面的总分排名）
     assessment_order = sorted(
-        rows, key=lambda row: (-row["best_submission_score"], row["username"])
+        rows, key=lambda row: (-row["top3_score"], row["username"])
     )
     for index, row in enumerate(assessment_order, start=1):
         row["assessment_grade"] = _assessment_grade_for_rank(index, student_count)
 
-    # 考核分数：在各等级段内按名次（沿用单题最高分排序）线性铺开到对应分数段
+    # 考核分数：在各等级段内按名次（沿用最高三次均分排序）线性铺开到对应分数段
     grade_groups = defaultdict(list)
     for row in assessment_order:
         grade_groups[row["assessment_grade"]].append(row)
