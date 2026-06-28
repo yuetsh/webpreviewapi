@@ -547,7 +547,7 @@ class GradebookApiTest(TestCase):
             rows[0],
             [
                 "排名",
-                "等级",
+                "平时等级",
                 "考核等级",
                 "考核分数",
                 "用户名",
